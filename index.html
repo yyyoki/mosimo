@@ -1,0 +1,876 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<meta name="theme-color" content="#0a0a0a" />
+<title>もしもコミュニティ</title>
+<style>
+  :root{
+    --bg:#0a0a0a;
+    --fg:#ffffff;
+    --dim:rgba(255,255,255,.55);
+    --line:rgba(255,255,255,.45);
+    --hair:rgba(255,255,255,.16);
+    --panel:#141414;
+  }
+  *{ box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
+  html,body{ height:100%; }
+  body{
+    background:var(--bg);
+    color:var(--fg);
+    font-family:"Hiragino Kaku Gothic ProN","Hiragino Sans","Noto Sans JP","Yu Gothic",YuGothic,Meiryo,sans-serif;
+    font-weight:700;
+    line-height:1.6;
+    letter-spacing:.02em;
+    -webkit-font-smoothing:antialiased;
+    overflow-x:hidden;
+  }
+  body::after{
+    content:"";
+    position:fixed; inset:9px;
+    border:1px solid var(--line);
+    pointer-events:none; z-index:50;
+  }
+
+  #app{
+    max-width:520px;
+    margin:0 auto;
+    min-height:100vh; min-height:100dvh;
+    padding:26px 22px calc(26px + env(safe-area-inset-bottom));
+    display:flex; flex-direction:column;
+  }
+
+  .screen{ display:none; flex:1; flex-direction:column; }
+  .screen.active{ display:flex; animation:fade .22s ease; }
+  @keyframes fade{ from{ opacity:0; transform:translateY(6px);} to{ opacity:1; transform:none; } }
+
+  .kicker{ font-size:11px; letter-spacing:.34em; color:var(--dim); font-weight:800; }
+  .link{
+    background:none; border:none; color:var(--dim);
+    font:inherit; font-size:12px; font-weight:700; letter-spacing:.14em;
+    cursor:pointer; padding:8px 0; align-self:flex-start;
+  }
+
+  /* ヘッダー */
+  .top{
+    display:flex; align-items:baseline; justify-content:space-between;
+    gap:10px; margin-bottom:14px;
+  }
+  .top h1{ font-size:clamp(19px,5vw,26px); font-weight:900; letter-spacing:.02em; line-height:1.3; }
+  .top h1 small{ display:block; font-size:10.5px; letter-spacing:.22em; color:var(--dim); font-weight:700; margin-top:6px; }
+  .top .link{ flex:none; white-space:nowrap; padding-top:0; }
+
+  /* デモモードの帯 */
+  .demo-note{
+    border:1px solid var(--line);
+    padding:9px 11px;
+    font-size:11px; font-weight:700; line-height:1.6; color:var(--dim);
+    margin-bottom:14px;
+  }
+  .demo-note b{ color:var(--fg); }
+
+  /* フィルタ */
+  .filters{ display:flex; flex-wrap:wrap; gap:7px; margin-bottom:16px; }
+  .filters button{
+    border:1px solid var(--line);
+    background:transparent; color:var(--dim);
+    font:inherit; font-weight:800; font-size:12px;
+    letter-spacing:.04em; padding:9px 12px; cursor:pointer;
+  }
+  .filters button.on{ background:var(--fg); color:var(--bg); border-color:var(--fg); }
+
+  /* フィードのカード */
+  .feed{ display:flex; flex-direction:column; gap:12px; flex:1; padding-bottom:76px; }
+  .card{
+    border:1px solid var(--line);
+    padding:15px 15px 12px;
+    cursor:pointer;
+  }
+  .card:active{ background:var(--panel); }
+  .badge{
+    display:inline-block;
+    border:1px solid var(--fg);
+    font-size:10.5px; font-weight:900; letter-spacing:.12em;
+    padding:3px 7px; margin-bottom:10px;
+  }
+  .card .q{ font-size:16.5px; font-weight:900; line-height:1.5; }
+  .card .body{ font-size:13.5px; font-weight:700; line-height:1.75; color:var(--dim); margin-top:6px; }
+  .card .body.clamp{ display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
+  .conds{ list-style:none; margin-top:9px; }
+  .conds li{ font-size:12px; font-weight:700; color:var(--dim); padding:3px 0 3px 16px; position:relative; }
+  .conds li::before{ content:counter(c); counter-increment:c; position:absolute; left:0; color:var(--fg); font-weight:900; }
+  .conds{ counter-reset:c; }
+  .meta{
+    display:flex; align-items:center; gap:10px;
+    margin-top:12px; padding-top:10px; border-top:1px solid var(--hair);
+    font-size:11.5px; font-weight:700; color:var(--dim);
+  }
+  .meta .who{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .like{
+    margin-left:auto; flex:none;
+    background:none; border:1px solid var(--line); color:var(--fg);
+    font:inherit; font-weight:800; font-size:12px;
+    padding:6px 10px; cursor:pointer;
+    display:flex; align-items:center; gap:6px;
+  }
+  .like.on{ background:var(--fg); color:var(--bg); border-color:var(--fg); }
+  .like:disabled{ opacity:1; }
+
+  .empty{ text-align:center; color:var(--dim); font-size:13px; font-weight:700; padding:40px 10px; line-height:1.9; }
+
+  /* 詳細 */
+  .detail-body{
+    border:1px solid var(--line);
+    padding:18px 16px;
+    font-size:14.5px; font-weight:600; line-height:1.95; letter-spacing:.02em;
+    white-space:pre-wrap;
+  }
+  .sect-title{ font-size:11px; letter-spacing:.3em; color:var(--dim); font-weight:800; margin:22px 0 8px; }
+
+  /* 投稿フォーム */
+  label.fld{ display:block; margin-top:18px; }
+  label.fld .lab{ font-size:11px; letter-spacing:.2em; color:var(--dim); font-weight:800; display:block; margin-bottom:7px; }
+  input[type="text"], textarea, select{
+    width:100%;
+    background:transparent;
+    border:1px solid var(--line);
+    color:var(--fg);
+    font:inherit; font-weight:700;
+    padding:12px 13px;
+    resize:vertical;
+  }
+  input::placeholder, textarea::placeholder{ color:var(--dim); }
+  input:focus, textarea:focus, select:focus{ outline:none; border-color:var(--fg); }
+  select{ appearance:none; }
+  .hint{ font-size:11px; font-weight:600; color:var(--dim); margin-top:6px; line-height:1.6; }
+
+  /* タイマー（遊ぶ） */
+  .timer{
+    font-size:clamp(64px,22vw,104px);
+    font-weight:900; font-variant-numeric:tabular-nums;
+    text-align:center; line-height:1; letter-spacing:.04em;
+  }
+  .timer-row{ display:flex; gap:10px; margin-top:22px; }
+  .timer-row button{ flex:1; }
+
+  /* ボタン */
+  .actions{ margin-top:auto; padding-top:22px; display:flex; flex-direction:column; gap:10px; }
+  button.btn{
+    display:block; width:100%;
+    background:var(--fg); color:var(--bg);
+    border:1px solid var(--fg);
+    font:inherit; font-weight:900; letter-spacing:.08em; font-size:15px;
+    padding:15px; cursor:pointer;
+  }
+  button.btn:active{ opacity:.75; }
+  button.btn.ghost{ background:transparent; color:var(--fg); }
+  button.btn.ghost:active{ background:var(--panel); }
+  button.btn.sm{ font-size:13px; padding:12px; letter-spacing:.1em; }
+  button.btn:disabled{ opacity:.3; cursor:default; }
+
+  .fab{
+    position:fixed; right:calc(50% - 260px + 16px); bottom:calc(20px + env(safe-area-inset-bottom));
+    z-index:40;
+    background:var(--fg); color:var(--bg); border:1px solid var(--fg);
+    font:inherit; font-weight:900; font-size:14px; letter-spacing:.06em;
+    padding:14px 18px; cursor:pointer; border-radius:0;
+  }
+  @media (max-width:552px){ .fab{ right:20px; } }
+
+  .toast{
+    position:fixed; left:50%; bottom:26px; transform:translateX(-50%) translateY(20px);
+    background:var(--fg); color:var(--bg);
+    font-size:13px; font-weight:800; padding:11px 18px;
+    opacity:0; transition:.25s; z-index:60; pointer-events:none;
+    max-width:88vw; text-align:center;
+  }
+  .toast.show{ opacity:1; transform:translateX(-50%) translateY(0); }
+
+  /* オンボーディング / チュートリアル */
+  .ob-center{ flex:1; display:flex; flex-direction:column; justify-content:center; text-align:center; }
+  .ob-center h1{ font-size:clamp(24px,7vw,32px); font-weight:900; line-height:1.4; margin-top:16px; }
+  .ob-center p{ font-size:14px; font-weight:700; color:var(--dim); line-height:1.9; margin-top:18px; }
+
+  .dots{ display:flex; gap:7px; justify-content:center; margin-bottom:20px; }
+  .dots i{ width:7px; height:7px; border:1px solid var(--line); border-radius:50%; display:block; }
+  .dots i.on{ background:var(--fg); border-color:var(--fg); }
+  .slide{ flex:1; display:flex; flex-direction:column; justify-content:center; text-align:center; }
+  .slide .n{ font-size:11px; letter-spacing:.32em; color:var(--dim); font-weight:800; }
+  .slide h2{ font-size:clamp(20px,6vw,26px); font-weight:900; line-height:1.5; margin:14px 0 18px; }
+  .slide p{ font-size:14px; font-weight:700; line-height:2; color:var(--dim); }
+  .link-row{ display:flex; justify-content:space-between; align-items:center; }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- はじめての人へ（チュートリアルを聞くか） -->
+  <section class="screen active" id="screen-onboard" data-screen="onboard">
+    <div class="ob-center">
+      <span class="kicker">MOSHIMO COMMUNITY</span>
+      <h1>もしもコミュニティ<br>へようこそ</h1>
+      <p>はじめてですか？<br>使い方を1分だけ説明します。<br>聞かなくても、あとから「使い方」で見られます。</p>
+    </div>
+    <div class="actions">
+      <button class="btn" id="ob-yes">使い方を聞く</button>
+      <button class="btn ghost sm" id="ob-no">聞かずに始める</button>
+    </div>
+  </section>
+
+  <!-- チュートリアル -->
+  <section class="screen" id="screen-tutorial" data-screen="tutorial">
+    <div class="dots" id="tut-dots"></div>
+    <div class="slide" id="tut-slide"></div>
+    <div class="actions">
+      <button class="btn" id="tut-next">次へ</button>
+      <div class="link-row">
+        <button class="link" id="tut-prev">‹ もどる</button>
+        <button class="link" id="tut-skip">とばす</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- フィード -->
+  <section class="screen" id="screen-feed" data-screen="feed">
+    <div class="top">
+      <h1>もしもコミュニティ<small>MOSHIMO COMMUNITY</small></h1>
+      <div style="display:flex;gap:14px;flex:none;">
+        <button class="link" id="howto-btn">使い方</button>
+        <button class="link" id="reload-btn">↻ 更新</button>
+      </div>
+    </div>
+
+    <div class="demo-note" id="demo-note" hidden>
+      <b>デモモード</b>：投稿はこの端末内だけに保存されます。みんなで共有するには
+      <code>CONFIG.GAS_URL</code> に Google Apps Script の URL を設定してください（同梱の README 参照）。
+    </div>
+
+    <div class="filters" id="filters">
+      <button data-f="all" class="on">すべて</button>
+      <button data-f="topic">お題</button>
+      <button data-f="topic_answer">仮ANSWERつき</button>
+      <button data-f="report">名回答・プレイ結果</button>
+    </div>
+
+    <div class="feed" id="feed"></div>
+
+    <div class="actions">
+      <button class="btn ghost sm" id="feed-more" hidden>もっと見る</button>
+    </div>
+  </section>
+
+  <!-- 詳細 -->
+  <section class="screen" id="screen-detail" data-screen="detail">
+    <button class="link" data-go="feed">‹ 一覧にもどる</button>
+    <span class="badge" id="d-badge"></span>
+    <div id="d-content"></div>
+    <div class="meta" style="border-top:none;padding-top:0;margin-top:16px;">
+      <span class="who" id="d-who"></span>
+      <span id="d-when"></span>
+      <button class="like" id="d-like"><span>♡</span><span id="d-likes">0</span></button>
+    </div>
+    <div class="actions">
+      <button class="btn" id="d-play" hidden>このお題で遊ぶ</button>
+      <button class="btn ghost sm" data-go="feed">一覧にもどる</button>
+    </div>
+  </section>
+
+  <!-- 投稿 -->
+  <section class="screen" id="screen-compose" data-screen="compose">
+    <button class="link" data-go="feed">‹ やめる</button>
+    <div class="top"><h1>投稿する</h1></div>
+
+    <label class="fld">
+      <span class="lab">種類</span>
+      <select id="c-type">
+        <option value="topic">お題（もしも○○だったら？）</option>
+        <option value="topic_answer">お題 ＋ 仮ANSWER（模範解答つき）</option>
+        <option value="report">名回答・プレイ結果</option>
+      </select>
+    </label>
+
+    <div id="c-topic-fields">
+      <label class="fld">
+        <span class="lab">お題</span>
+        <input type="text" id="c-question" placeholder="もしも家に牛が届いたらどうするのか" maxlength="60" />
+      </label>
+      <label class="fld">
+        <span class="lab">条件（1行に1つ・2〜3個）</span>
+        <textarea id="c-conditions" rows="3" placeholder="どういった家に住んでいるか&#10;どのように飼育して、暮らすか"></textarea>
+        <span class="hint">話し合いの取っかかり。「場所」「心配ごと」「名前・見た目」など方向を散らすと機能します。</span>
+      </label>
+    </div>
+
+    <label class="fld" id="c-answer-wrap" hidden>
+      <span class="lab">仮ANSWER（模範解答）</span>
+      <textarea id="c-answer" rows="6" placeholder="現実離れした発想で、細部まで詰めた完成例を書いてください。"></textarea>
+    </label>
+
+    <div id="c-report-fields" hidden>
+      <label class="fld">
+        <span class="lab">タイトル・状況</span>
+        <input type="text" id="c-title" placeholder="「牛が届いたら」で出た名回答" maxlength="60" />
+      </label>
+      <label class="fld">
+        <span class="lab">本文（名回答・盛り上がった話）</span>
+        <textarea id="c-report" rows="6" placeholder="実際に遊んで生まれた回答や、盛り上がった展開を書いてください。"></textarea>
+      </label>
+    </div>
+
+    <label class="fld">
+      <span class="lab">ニックネーム</span>
+      <input type="text" id="c-nick" placeholder="名無しでもOK" maxlength="16" />
+    </label>
+
+    <div class="actions">
+      <button class="btn" id="c-submit">投稿する</button>
+    </div>
+  </section>
+
+  <!-- 遊ぶ（コミュニティのお題で） -->
+  <section class="screen" id="screen-play" data-screen="play">
+    <button class="link" id="play-back">‹ 詳細にもどる</button>
+    <div class="top"><h1 id="play-q" style="font-size:18px;line-height:1.5;"></h1></div>
+    <ul class="conds" id="play-conds"></ul>
+    <div style="flex:1;display:flex;flex-direction:column;justify-content:center;">
+      <div class="timer" id="play-timer">15:00</div>
+      <div class="timer-row">
+        <button class="btn ghost sm" id="play-toggle">スタート</button>
+        <button class="btn ghost sm" id="play-reset">リセット</button>
+      </div>
+    </div>
+    <div class="actions">
+      <button class="btn" id="play-reveal" hidden>仮ANSWERを見る</button>
+      <div class="detail-body" id="play-answer" hidden></div>
+    </div>
+  </section>
+
+</div>
+
+<button class="fab" id="fab">＋ 投稿</button>
+<div class="toast" id="toast"></div>
+
+<script>
+/* =========================================================
+   設定 — Google Apps Script のウェブアプリURLをここに貼ると、
+   投稿がスプレッドシートに保存され、みんなで共有できます。
+   空のままだとこの端末内だけのデモモードで動きます。
+   （セットアップ手順は同梱の README.md）
+   ========================================================= */
+const CONFIG = {
+  GAS_URL: ""
+};
+
+const TYPE_LABEL = {
+  topic: "お題",
+  topic_answer: "お題＋仮ANSWER",
+  report: "名回答・プレイ結果"
+};
+const STORE_KEY = "moshimoshi-community/v1";
+const LIKED_KEY = "moshimoshi-community/liked";
+
+/* ---------- ストレージ層（GAS or ローカル） ---------- */
+const isRemote = () => !!CONFIG.GAS_URL;
+
+/* もしもカードの収録お題（51問）をコミュニティの初期投稿として読み込む */
+const CARD_TOPICS = [
+  { q:"もしも家に牛が届いたらどうするのか", c:["どういった家に住んでいるか","どのように飼育して、暮らすか"], a:"マンションの3階。まず自分が住む3階に連れて行かないといけないが、階段は厳しい。なので、エレベーターを使って上に上がろうとするが、そのままだと入らない。なので、牛を縦にして運ぶ。そこから3階についたら、牛を横に戻して、玄関前まで運び、紐を括って置いておく。そこで、朝になったら、コップを持って玄関を出て牛の乳を絞って、飲み込む。最高の朝を迎えるのだ。" },
+  { q:"もしも家にキリンが届いたらどうするのか", c:["どういった家に住んでいるか","どのように飼育して、暮らすか"], a:"一戸建てだが天井の高さは2.4メートルしかない。まず屋根を解体業者に頼んで丸ごと外してもらい、リビングを吹き抜けに改造する。キリンは首だけ2階部分に出す形で暮らしてもらい、夜は雨が降らないようブルーシートを首の周りに巻いておく。エサは近所の八百屋と契約して、毎朝キャベツの葉を屋根の穴から差し入れる。ご近所には「観葉植物です」と説明して納得してもらう。" },
+  { q:"もしも家に象が届いたらどうするのか", c:["どういった家に住んでいるか","どのように運び入れて、生活の場所を確保するか"], a:"平屋の一軒家で、庭付き。象はもちろん玄関から入らないので、庭に面したリビングのガラス戸を全部取り払い、庭とリビングを一体化させて「半屋外リビング」にする。就寝時は象に大きな蚊帳をかけ、朝は象の背中に脚立をかけて洗濯物を干すスペースとして活用する。お風呂は諦めて、象と一緒に近所の川で済ませることにする。" },
+  { q:"もしも家にペンギン100羽が届いたらどうするのか", c:["どういった家に住んでいるか","100羽をどう管理して、共存していくか"], a:"2LDKの賃貸マンション。まず和室にエアコンを2台追加し、室温を5度に固定して南極ゾーンを作る。ペンギンは種類ごとに部屋を分け、リビングは「集会場」として開放する。餌の魚は毎朝業務用スーパーで箱買いし、洗面所を魚さばき場に改造する。管理会社にはバレないよう、ベランダには「観賞用の白い置物です」と札を立てておく。" },
+  { q:"もしも家に激熱の隕石が届いたらどうするのか", c:["どこに落ちてきたか","どのように冷まして、その後どう扱うか"], a:"布団の真横、畳の上に着弾。まず耐熱手袋とBBQ用のトングで隕石を挟み、浴槽に水を張って一晩冷やす。冷めたら質量を測って「これは絶対高く売れる」と信じ、フリマアプリに出品するための写真撮影用にスポットライトを買いに行く。売れるまでの間は、玄関の靴べらの横に「幸運の石」として飾っておく。" },
+  { q:"もしも自分の影が独立して自我を持ったらどうするのか", c:["影はどんな性格になったか","どうやって影と一緒に生活していくか"], a:"影は自分よりずっと社交的な性格になり、毎晩勝手に壁を伝って隣の部屋まで遊びに行ってしまう。仕方なく門限を22時に設定し、リビングの電気を全部消して影を強制的に壁に戻す。日中は影に家計簿をつける係を任せ、光を当てる角度を変えることで影の体をリモコン代わりに動かして家事を手伝ってもらう。" },
+  { q:"もしも家の中に海が出現したらどうするのか", c:["どの部屋に、どれくらいの規模で出現したか","生活空間をどう確保するか"], a:"リビング一面が深さ1.5メートルの海になる。テレビ台と本棚は2階に緊急避難させ、リビングへはシュノーケルで移動することにする。潮の満ち引きがあるらしく、朝は洗面所まで潮が満ちてくるので、歯磨きはウェットスーツを着て行う。魚が住み着き始めたので、リビングは「うちの生簀」と呼ぶことにして、たまに夕飯用に釣る。" },
+  { q:"もしも玄関がブラックホールに繋がったらどうするのか", c:["いつ、どうやって気づいたか","玄関をどう使い続けるか、あるいは使わないか"], a:"ある朝、郵便物を取りに出たら新聞だけ吸い込まれて気づいた。とりあえず玄関のドアには「使用禁止・重量物注意」と貼り紙をし、出入りは全部ベランダから縄ばしごで行うことにする。ゴミ出しだけはブラックホールに直接投げ込む形で解決し、「一番エコな家」と自分に言い聞かせることにする。" },
+  { q:"もしも自分の体が急に3メートルの巨人になったらどうするのか", c:["家のどこで生活するか","服や食事はどうするか"], a:"家には入れないので、庭にブルーシートで屋根だけ張ったスペースを作って暮らすことにする。服は近所の畳屋にお願いして、畳の表を布代わりに縫い合わせてもらう。食事は3食とも米びつ1本分を炊いて、丼ではなくバケツで食べる。近所の目が気になるので「大きい着ぐるみを研究してます」と説明して回る。" },
+  { q:"もしも家にトリケラトプスの赤ちゃんが届いたらどうするのか", c:["どういった家に住んでいるか","どのように育てるか"], a:"庭付きの2階建て。1階の和室をぶち抜いて放牧スペースにし、フローリングには滑らないよう芝生マットを敷き詰める。エサは近所の家庭菜園から野菜クズを分けてもらう契約を結ぶ。角がまだ柔らかいうちにと思い、毎晩リビングで一緒にテレビを見る習慣をつけて、なつかせることに成功する。" },
+  { q:"もしも冷蔵庫の中が異世界に繋がっていたらどうするのか", c:["いつ、どうやって気づいたか","この冷蔵庫をどう扱うか"], a:"牛乳を取ろうとして腕まで冷蔵庫に沈み込み気づいた。とりあえず冷蔵庫の扉には南京錠をかけ、開ける時は必ず命綱代わりのエプロンの紐を洗濯機に結んでから開けることにする。異世界からは謎の果物が逆流してくるようになったので、それを晩ご飯のデザートにする生活を始める。" },
+  { q:"もしも家中の家具が急に喋り出したらどうするのか", c:["家具たちはどんな性格になったか","家具たちとどう折り合いをつけて暮らすか"], a:"ソファはやたら説教くさい性格になり、座るたびに「もっと運動しろ」と言ってくる。仕方なく、ソファの小言を聞き流すためにイヤホンをして座ることを日課にする。テーブルは逆に優しい性格で、勉強を教えてくれるようになったので、テーブルの前だけ勉強スペースとして活用することにする。" },
+  { q:"もしも自分の部屋の重力だけ逆になったらどうするのか", c:["家具や荷物をどう固定するか","生活(睡眠・食事)をどう成立させるか"], a:"まずベッドを天井にボルトで固定し、寝るときは重力に従って天井で寝ることにする。食事は皿が落ちない(上がらない)ようにマグネットプレートを導入し、コップの水がこぼれないよう全部ストロー付きの水筒に変える。友達が遊びに来るときは部屋の入り口で「ここから上が下です」と注意書きを見せてから案内する。" },
+  { q:"もしも家にゴリラの家族が引っ越してきたらどうするのか", c:["どこに住んでもらうか","どう共同生活していくか"], a:"2階の子供部屋をまるごと明け渡し、家具は全部撤去してタイヤのブランコを設置する。食事は毎朝バナナを1房ずつ配給制にし、リビングでの共同テレビ鑑賞ルールとして「格闘技中継のときはゴリラ家族を優先する」という取り決めを作る。しつけがてら、洗濯物たたみを手伝ってもらう係にする。" },
+  { q:"もしも郵便受けから毎日「未来の自分」からの手紙が届いたらどうするのか", c:["手紙にはどんな内容が書かれているか","その手紙とどう付き合っていくか"], a:"手紙にはいつも「今日の夕飯は絶対にカレーにしろ」のような、どうでもいい生活指示だけが書かれている。最初は半信半疑だったが、指示通りにすると謎に体調が良いことに気づき、毎朝手紙をチェックしてから1日の予定を組む生活になる。返事を書いても届く様子はないが、一応「ありがとう、頑張って」とだけ書いて送り続けている。" },
+  { q:"もしも家の庭に突然火山ができたらどうするのか", c:["火山の大きさはどれくらいか","庭とどう付き合っていくか"], a:"高さ2メートルほどの小型の火山で、常に軽く煙を上げている。まず火山の周りに耐熱レンガを積んでバーベキューコンロ代わりに使うことにする。噴火で灰が飛んでくる日は洗濯物を室内干しにし、逆に無風の日は「今日は洗濯日和」と近所に触れ回る。年に一度、火山感謝祭と称して近所を呼んで焼き芋大会を開く。" },
+  { q:"もしも家に本物のドラゴンの卵が届いて、今にも孵化しそうだったらどうするのか", c:["卵をどこで保管しているか","孵化した後、どう育てるか"], a:"こたつの中に卵を入れて温めることにする。孵化の兆候として卵が揺れ始めたら、家族全員でこたつを囲んで見守る態勢を取る。生まれた後は、火を吐く練習をベランダでさせ、洗濯物に火がつかないよう金属製の物干し竿に交換する。近所には「大きめのトカゲです」と説明して、火を吐くところは見せないようにする。" },
+  { q:"もしも自分だけ時間が10倍速で進むようになったらどうするのか", c:["周りの人にはどう見えているか","この体質とどう付き合っていくか"], a:"周りから見ると自分は残像しか見えないくらいの速さで動いているらしい。会話は成立しないので、伝えたいことは全部先に紙に書いておいて渡す方式にする。時間が有り余るので、1日で読書を50冊終わらせ、余った時間で近所の掃除を全部済ませておくようにする。ただしお腹はすぐ空くので、食事の回数だけは人の10倍に増やす。" },
+  { q:"もしも家がある日突然無人島に転送されたらどうするのか", c:["島にはどんな環境があるか","家の設備をどう活かして生活するか"], a:"ヤシの木が数本生えているだけの小さな島。まず屋根の雨どいを改造して雨水をためるタンクにし、庭にあった家庭菜園をそのまま畑として拡張する。Wi-Fiは当然使えないので、テレビの代わりに毎晩家族で影絵をして過ごすことにする。島の名前は「元・自宅島」と勝手に名付けて、いつか救助が来たら看板を立てて驚かせようと計画する。" },
+  { q:"もしも家に宇宙人の家族がホームステイに来たらどうするのか", c:["宇宙人はどんな見た目・習性か","どうもてなして、共同生活するか"], a:"見た目は人間そっくりだが、食事は電球を1日3個食べるという習性を持っている。とりあえず近所の電気屋と大量購入契約を結び、食費ならぬ「電球費」を家計簿に新項目として追加する。会話は身振り手振りだが、なぜか将棋だけは通じ合えることが分かり、毎晩の将棋対決が家族の日課になる。" },
+  { q:"もしも自分の家の壁が全部透明になったらどうするのか", c:["どの部屋から透明になったか","プライバシーをどう確保するか"], a:"お風呂場から透明になり始めた。とりあえずお風呂には大量の観葉植物を並べて目隠しにし、着替えは布団の中に潜り込んで行うことにする。逆にリビングが透明なのはご近所付き合いにちょうどいいと開き直り、「いつでも遊びに来て」と手を振れるように、あえてカーテンをつけないことにする。" },
+  { q:"もしも家にシロクマが冬眠しにやってきたらどうするのか", c:["どこで冬眠させるか","冬眠中・目覚めた後どう過ごすか"], a:"寒さを保つため、使っていない北向きの部屋のエアコンを最強の冷房設定にして「冬眠部屋」にする。電気代がかさむので、代わりにその部屋の掃除と見回りだけは家族の仕事として分担する。春に目覚めたら、お礼にと近所の川へ一緒に鮭を取りに行き、ついでにピクニックをして解散することになる。" },
+  { q:"もしも家の水道から突然温泉が出るようになったらどうするのか", c:["どの蛇口から出るようになったか","この温泉とどう付き合っていくか"], a:"台所の蛇口から突然、硫黄の匂いのするお湯が出るようになる。皿洗いをするたびに指先の血行が良くなる気がして、逆にありがたく使うことにする。お風呂にも配管を無理やり引き込み、「自宅温泉」と称して友人を招待する会を月1で開催する。近所には内緒にして、家族だけの秘密にしておくことにする。" },
+  { q:"もしも自分そっくりの影武者が家に住み着いたらどうするのか", c:["影武者とどう見分けるか","影武者にどんな役割を任せるか"], a:"見た目も声も完全に同じだが、辛い物を全く食べられないことだけが違いだと分かる。そこで、面倒な飲み会や苦手な親戚の集まりには影武者に激辛料理のお店を指定して代わりに行ってもらい、正体がバレないようにする。代わりに自分は、影武者が苦手な長風呂と早起きの担当を引き受けることにする。" },
+  { q:"もしも自分の家がロケットになって宇宙に飛んだらどうするのか", c:["いつ、どうやって発射したか","宇宙でどう生活するか"], a:"ある朝、洗濯機のスイッチを押した瞬間に床から炎が噴き出し、そのまま発射してしまう。無重力になった部屋では洗濯物が全部宙に浮いてしまうので、洗濯バサミで壁に留めて干すスタイルに変更する。窓から見える地球を見ながら、家族で「そろそろ晩ご飯かな」と地球時間を基準に生活リズムを保つことにする。" },
+  { q:"もしも自分の靴が急に自分の意志で歩き出したらどうするのか", c:["靴はどこへ行こうとするか","靴とどう折り合いをつけるか"], a:"靴はなぜか毎回コンビニのおでんコーナーに向かおうとする。仕方なく、出かける前に必ず一度おでんを買いに行く「儀式」を済ませてから、本来の目的地に向かうようにする。夜、玄関で靴を脱ぐときは「今日もありがとう」と声をかけてから揃えておくのが日課になる。" },
+  { q:"もしも家の中の時計が全て逆回りし始めたらどうするのか", c:["いつから逆回りになったか","生活リズムをどう保つか"], a:"引っ越しの日を境に、家中の時計の針が全部逆に回り始める。仕方なく、時計を見るときは鏡越しに確認する習慣をつけて対応することにする。学校や仕事の時間に遅れないよう、スマホのアラームだけは絶対に家の外で設定するというルールを新たに作る。" },
+  { q:"もしも近所の公園がまるごと家の中に引っ越してきたらどうするのか", c:["公園のどの設備が、家のどこに出現したか","公園とどう共存するか"], a:"滑り台がリビングの真ん中に、砂場が浴室に出現する。滑り台は2階から1階への新しい移動手段として正式に採用し、階段はもう使わないことにする。砂場はそのまま猫のトイレ拡張スペースとして活用し、近所の子供たちには「毎週土曜だけ開放日」と貼り紙をして遊びに来てもらうことにする。" },
+  { q:"もしも家に巨大なクジラが空を飛んで迷い込んできたらどうするのか", c:["クジラはどこに居座ってしまったか","どう共存し、いずれ見送るか"], a:"屋根の上に乗っかる形で動けなくなってしまう。屋根が抜けないか心配なので、まず建築士の友人を呼んで補強してもらう。クジラが乾燥しないよう毎朝ホースで放水するのが日課になり、逆にそれが近所で「朝の涼しい風物詩」として評判になる。1ヶ月後、満月の夜に潮の匂いを追って自然に飛んでいくのを、家族全員で見送ることになる。" },
+  { q:"もしも家の屋根が透明なドームになって宇宙が見えるようになったらどうするのか", c:["いつ、どうやってそうなったか","生活の中でどう活かすか"], a:"台風の次の日、目を覚ましたら屋根がガラスドームに変わっていた。夏は温室状態で暑すぎるので、日中はすだれを星座早見盤代わりにドームに吊るしておくことにする。夜は電気を消してリビングで寝転がるのが日課になり、流れ星が見えた日はノートに記録をつける「観測係」を家族で交代で担当する。" },
+  { q:"もしも家中の壁が急にチョコレートでできてしまったらどうするのか", c:["どの部屋の壁からチョコレートになったか","溶けたり食べられたりしないよう、どう管理するか"], a:"台所の壁から、匂いでチョコレートだと気づく。夏場は溶けるのが心配なので、24時間エアコンをつけっぱなしにして「壁の温度管理」を最優先の家計項目にする。子供が壁をかじってしまう問題が起きたので、壁の下半分だけ板で覆って「食べていいのは上半分だけ」というルールを設ける。" },
+  { q:"もしも自分の家がテレビ番組で24時間生中継されるようになったらどうするのか", c:["どの部屋にカメラが設置されているか","生活をどう変えて対応するか"], a:"リビングと洗面所にだけカメラが設置されている。仕方なく、リビングでは常に身だしなみを整えておくことにし、着替えは洗面所ではなくクローゼットの中で行う新習慣ができる。逆に視聴者からの応援コメントが励みになり、毎晩「今日の家族会議」をリビングで公開で行うのが恒例になる。" },
+  { q:"もしも家の庭に恐竜サイズのニワトリが住み着いたらどうするのか", c:["どうやって住み着くことになったか","卵や鳴き声にどう対応するか"], a:"ある朝、庭に卵の殻が散らばっていて気づいたら、すでに巨大なニワトリが居座っていた。産む卵が1個で家族4人分の朝食になるほど大きいので、毎朝オムレツ当番を家族で交代制にする。鳴き声が近所迷惑にならないよう、鶏小屋の代わりに防音カーテンで庭全体を囲むことにする。" },
+  { q:"もしも自分の家だけ1日が48時間になったらどうするのか", c:["この現象に周りは気づいているか","余った時間をどう使うか"], a:"家の外に出た瞬間、時間の流れが普通に戻るので、家族以外は誰も気づいていない。余った24時間を使って、毎日必ず一度は昼寝を挟む「二部制生活」を導入する。せっかくなので、前半の1日は仕事や勉強にあて、後半の1日はまるごと趣味と家族団らんに使うという理想の生活リズムが完成する。" },
+  { q:"もしも家に妖精の国からの使者が住むことになったらどうするのか", c:["使者はどんな姿・性格か","どうもてなし、共同生活するか"], a:"手のひらサイズで、やたらとお菓子にうるさい性格の妖精がやってくる。専用の部屋を用意する代わりに、本棚の隙間にドールハウスを設置して住んでもらうことにする。毎晩お礼として庭の花の世話をしてくれるようになり、その代わりに毎朝一粒だけ金平糖を用意する契約を交わす。" },
+  { q:"もしも家の中の物が全部、話しかけると1つだけ願いを叶えてくれるようになったらどうするのか", c:["最初に何に、何を願うか","願いを使い切った後どう暮らすか"], a:"最初に冷蔵庫に「一生食べ物が腐らないようにして」と願ってしまい、その場で使い切ってしまう。慌てて他の家具にも聞いて回るが、ソファは「座り心地を一生良くする」以外聞いてくれず、結局実用的な願いばかりで終わる。全部使い切った後は、普通の家に戻ったことにむしろホッとして、物を大事に長く使おうと心に誓う生活が始まる。" },
+  { q:"もしも家に流れ着いた宝島の地図が届いたらどうするのか", c:["地図はどこに届いたか","この地図とどう向き合うか"], a:"古い引き出しの奥から、焦げ跡のついた地図が出てくる。半信半疑ながらも、休日を使って地図に描かれた近所の神社の裏山を掘りに行くことにする。結局出てきたのはタイムカプセルだったが、それはそれで盛り上がり、毎年その日を「掘削記念日」として家族で祝うことになる。" },
+  { q:"もしも玄関を開けるたびに違う国につながるようになったらどうするのか", c:["いつ、どうやって気づいたか","この玄関とどう付き合っていくか"], a:"ゴミ出しに行こうとしたら、いきなり見知らぬ市場に出てしまい気づく。危ないので、出かける前には必ず一度スマホの翻訳アプリを開いてから玄関を開ける習慣をつける。逆に毎日海外旅行気分を味わえるとポジティブに捉え、休日は「今日はどこに行けるかな」というくじ引き感覚で玄関を開けるのが楽しみになる。" },
+  { q:"もしも家の観葉植物が急に喋って、辛口の人生相談に乗ってくるようになったらどうするのか", c:["植物はどんな口調で話すか","どんな距離感で付き合っていくか"], a:"やたら達観した口調で、聞いてもいない人生の教訓を語ってくる。最初は鬱陶しく感じるが、意外と的確なアドバイスが多いので、週末だけ水やりのついでに相談する時間を設けることにする。ただし恋愛の相談だけは的外れなことが多いので、その話題だけは避けるようにしている。" },
+  { q:"もしも寝ている間だけ体が透明になる体質になったらどうするのか", c:["いつ気づいたか","家族や周りにどう説明するか"], a:"家族に「布団が浮いている」と指摘されて気づく。誤解を避けるため、寝るときは必ず蛍光テープを腕と足に巻いてから寝る習慣をつける。朝起きたときに体が見えているか毎回鏡でチェックするのが日課になり、たまに寝坊して透明のまま朝食を食べに行き、家族を驚かせてしまうこともある。" },
+  { q:"もしも家中の鏡が、5秒だけ未来の自分を映すようになったらどうするのか", c:["いつ、どうやって気づいたか","この鏡とどう付き合っていくか"], a:"寝癖を直そうと鏡を見た瞬間、5秒後の少しだけ機嫌の悪そうな自分が映って気づく。毎朝、鏡の前で深呼吸してから見るようにし、機嫌の悪い自分が映った日は特に気をつけて1日を過ごすようにする。おかげで無意識のうちに小さなトラブルを避けられるようになり、家族から「勘がいいね」と言われるようになる。" },
+  { q:"もしも来月から給料が3倍になる代わりに、誰の役にも立たない仕事に変わったらどうするのか", c:["今の仕事の何を手放す覚悟があるか","家族にどう説明するか"], a:"まず、毎朝挨拶をしてくれる後輩と、たまに相談に乗ってくれる先輩と過ごす時間を手放す覚悟が必要だと気づく。家族には「お金は増えるけど、誰にも必要とされない仕事になる」と正直に話すと、意外にも「それなら今のままでいいよ」と即答される。結局、給料よりも「今日も誰かの役に立てた」という一言の方が自分にとって大事だったと気づかされる。" },
+  { q:"もしも自分の仕事が明日から「誰か一人だけを笑顔にする仕事」に変わったらどうするのか", c:["誰を笑顔にしたいか","具体的に何をするか"], a:"真っ先に思い浮かんだのは、いつも先に帰らせてくれる同僚の顔だった。その人が疲れて帰る日を狙って、こっそりデスクに好きなお菓子を置いておくことにする。次の日、何も言わずに「これ美味しかった、ありがとう」とだけ言われた瞬間、今の仕事の中にもすでに「誰かを笑顔にする時間」がちゃんとあったことに気づく。" },
+  { q:"もしも上司が実は宇宙人で「なぜあなたはそんなに頑張って働いているのか」を本気で知りたがっていたらどう説明するのか", c:["どんな例え話で説明するか","宇宙人にどう納得してもらうか"], a:"「地球には、自分のためだけじゃ頑張れないけど、誰かのためなら頑張れるという不思議な性質がある」と説明することにする。証拠として、疲れた顔で帰ってきても子供の寝顔を見た瞬間に元気が出る話をすると、宇宙人は深くうなずき、「その非効率さが人間の一番の武器かもしれない」とメモを取り始める。" },
+  { q:"もしも100年後の自分の子孫が、今のあなたの働く姿をこっそり見に来たらどうするのか", c:["子孫に何を見せたいか","何を隠したいか"], a:"見せたいのは、うまくいかない日でも次の日ちゃんと机に向かう姿。隠したいのは、休憩室で愚痴ばかりこぼしている時間。子孫が見ているかもしれないと思うと、その日はいつもより少しだけ丁寧にメールを打ち、少しだけ早く帰って家族との時間を大事にしてみようという気持ちになる。" },
+  { q:"もしも会社に「今日一日だけ、誰か一人のために全力で働く日」ができたらどうするのか", c:["誰のために働くか","具体的に何をするか"], a:"選んだのは、いつも先に出社して掃除をしてくれている警備員さん。その日は自分の仕事を早めに片付けて、代わりに簡単な事務作業を手伝いに行くことにする。「誰かのためだけに」と決めて働いた1日は、いつもの仕事よりずっと疲れたはずなのに、なぜか一番気持ちよく眠れた夜になる。" },
+  { q:"もしも仕事を辞めても家族が今と同じ生活を送れるお金が急に手に入ったら、それでも働き続けるのか", c:["何日くらい休んでから答えを出すか","働き続けるなら、何のために働くと言えるか"], a:"とりあえず2週間だけ何もせず過ごしてみることにする。最初の3日は最高だったが、1週間を過ぎたあたりから「誰かに必要とされていない」時間がじわじわ苦しくなってくる。結局、お金のためではなく「今日も誰かに頼られた」という実感のために働いていたのだと気づき、2週間後には少し照れながら会社に戻ることにする。" },
+  { q:"もしも自分の仕事の「本当の意味」を、神様が1日だけ教えてくれるとしたらどうするのか", c:["神様にまず何を聞くか","教えてもらった後、明日から何を変えるか"], a:"まず「この仕事は本当に誰かの役に立っているのか」とストレートに聞いてみる。神様は答える代わりに、自分が去年何気なく作った資料を、今も誰かが毎日使っている様子をこっそり見せてくれる。派手な感謝の言葉はなかったけれど、それだけで十分だったと気づき、明日からは地味な仕事にも少しだけ丁寧に向き合おうと決める。" },
+  { q:"もしも同僚がある日突然「なぜそんなに頑張れるの?」と真剣に聞いてきたらどう答えるか", c:["どんな場面で聞かれるか","どう答えるか"], a:"終電間際のオフィスで、疲れた顔の同僚から聞かれる。とっさに立派な答えは出てこず、「多分、頑張ってる自分を家で待っててくれる人がいるからだと思う」とだけ答える。同僚はしばらく黙った後、「自分にもそういう人がいたな」とだけ言って、二人でその日は少し早めに電気を消して帰ることにする。" },
+  { q:"もしも仕事終わりに「今日誰かのためになったこと」を1つ発表しないと帰れないルールができたらどうするのか", c:["発表するネタが本当にない日はどうするか","このルールがある生活をどう感じるか"], a:"ネタがない日は、帰り際にわざとエレベーターのボタンを他の人より先に押すことにして、それを無理やり発表することにする。最初は面倒なルールだと思っていたが、続けるうちに「今日は誰かの役に立てたか」を自然と意識するようになり、発表するために1日を頑張れる、ちょっとした目的ができたことに気づく。" },
+  { q:"もしも10年後に、今のあなたの頑張りを見て感謝してくれる人からの手紙が今日届いたらどうするのか", c:["差出人は誰だと思うか","その手紙にどんな返事を書くか"], a:"差出人は、まだ何も返せていない今の後輩か、これから生まれてくる自分の子供のどちらかだろうと思う。手紙には多分「あの時頑張ってくれてありがとう」とだけ書かれているはずで、その一文だけで今日のしんどさが少し軽くなる。返事には「今はまだ何のためか分からないけど、とりあえず今日も頑張ってみます」とだけ書いて、机の引き出しにしまっておくことにする。" }
+];
+
+const SEED_BASE = Date.now() - 1000 * 60 * 60 * 24 * 20;
+const SEED = CARD_TOPICS.map((t, i) => ({
+  id: "card-" + (i + 1),
+  type: "topic_answer",
+  createdAt: SEED_BASE + i * 3600000,
+  question: t.q,
+  conditions: t.c,
+  modelAnswer: t.a,
+  body: "", title: "",
+  nickname: "もしもカード",
+  likes: 0
+})).concat([
+  {
+    id: "report-1", type: "report", createdAt: Date.now() - 1000*60*40,
+    question: "", conditions: [], modelAnswer: "",
+    title: "「玄関がブラックホール」で出た名回答",
+    body: "出入りはベランダから縄ばしごという話で全員一致したあと、「ゴミ出しはブラックホールに直接投げ込む」で爆笑。誰かが『一番エコな家じゃん』と言い出して、そのまま10分間ゴミの分別の話で盛り上がった。",
+    nickname: "3年2組", likes: 9
+  },
+  {
+    id: "report-2", type: "report", createdAt: Date.now() - 1000*60*60*6,
+    question: "", conditions: [], modelAnswer: "",
+    title: "「家にキリンが届いたら」でうちのゼミが出した結論",
+    body: "屋根を外して首を2階に出す案までは全員一致。そこから「首に雨が当たる問題」で30分もめて、最終的に『傘を1本、常に首に固定する』で決着。傘の色で気分を表現できるという副次効果まで議論した。",
+    nickname: "たけし", likes: 4
+  }
+]);
+
+function loadLocal(){
+  try{
+    const raw = localStorage.getItem(STORE_KEY);
+    if(raw) return JSON.parse(raw);
+  }catch(e){}
+  return SEED.slice();
+}
+function saveLocal(posts){
+  try{ localStorage.setItem(STORE_KEY, JSON.stringify(posts)); }catch(e){}
+}
+
+const likedSet = (() => {
+  try{ return new Set(JSON.parse(localStorage.getItem(LIKED_KEY) || "[]")); }
+  catch(e){ return new Set(); }
+})();
+function markLiked(id){
+  likedSet.add(id);
+  try{ localStorage.setItem(LIKED_KEY, JSON.stringify([...likedSet])); }catch(e){}
+}
+
+async function apiList(){
+  if(isRemote()){
+    const res = await fetch(CONFIG.GAS_URL + "?action=list", { method:"GET" });
+    const data = await res.json();
+    return (data.posts || []).map(normalize);
+  }
+  return loadLocal().map(normalize);
+}
+async function apiCreate(post){
+  if(isRemote()){
+    const res = await fetch(CONFIG.GAS_URL, {
+      method:"POST",
+      body: JSON.stringify({ action:"create", post })
+    });
+    const data = await res.json();
+    return normalize(data.post);
+  }
+  const posts = loadLocal();
+  const saved = normalize(Object.assign({
+    id: "local-" + Date.now(),
+    createdAt: Date.now(),
+    likes: 0
+  }, post));
+  posts.unshift(saved);
+  saveLocal(posts);
+  return saved;
+}
+async function apiLike(id){
+  if(isRemote()){
+    const res = await fetch(CONFIG.GAS_URL, {
+      method:"POST",
+      body: JSON.stringify({ action:"like", id })
+    });
+    const data = await res.json();
+    return data.likes;
+  }
+  const posts = loadLocal();
+  const p = posts.find(x => x.id === id);
+  if(p){ p.likes = (p.likes|0) + 1; saveLocal(posts); return p.likes; }
+  return 0;
+}
+function normalize(p){
+  p = p || {};
+  return {
+    id: String(p.id || ""),
+    type: p.type || "topic",
+    createdAt: Number(p.createdAt) || Date.now(),
+    question: p.question || "",
+    conditions: Array.isArray(p.conditions) ? p.conditions
+      : (typeof p.conditions === "string" && p.conditions ? p.conditions.split("\n").filter(Boolean) : []),
+    modelAnswer: p.modelAnswer || "",
+    title: p.title || "",
+    body: p.body || "",
+    nickname: p.nickname || "名無し",
+    likes: p.likes | 0
+  };
+}
+
+/* ---------- 画面 ---------- */
+const screens = document.querySelectorAll(".screen");
+function go(name){
+  screens.forEach(s => s.classList.toggle("active", s.dataset.screen === name));
+  document.getElementById("fab").style.display = (name === "feed") ? "" : "none";
+  window.scrollTo(0, 0);
+  if(name !== "play") stopTimer();
+  if(name === "feed" && allPosts.length) renderFeed();
+}
+document.querySelectorAll("[data-go]").forEach(el => el.addEventListener("click", () => go(el.dataset.go)));
+
+function toast(msg){
+  const t = document.getElementById("toast");
+  t.textContent = msg;
+  t.classList.add("show");
+  clearTimeout(toast._t);
+  toast._t = setTimeout(() => t.classList.remove("show"), 2400);
+}
+function relTime(ts){
+  const s = Math.floor((Date.now() - ts) / 1000);
+  if(s < 60) return "たった今";
+  if(s < 3600) return Math.floor(s/60) + "分前";
+  if(s < 86400) return Math.floor(s/3600) + "時間前";
+  return Math.floor(s/86400) + "日前";
+}
+
+/* ---------- フィード ---------- */
+let allPosts = [];
+let filter = "all";
+
+async function refreshFeed(){
+  const feed = document.getElementById("feed");
+  feed.innerHTML = '<div class="empty">読み込み中…</div>';
+  try{
+    allPosts = await apiList();
+    allPosts.sort((a, b) => b.createdAt - a.createdAt);
+  }catch(e){
+    feed.innerHTML = '<div class="empty">読み込みに失敗しました。<br>通信環境か CONFIG.GAS_URL を確認してください。</div>';
+    return;
+  }
+  renderFeed();
+}
+function renderFeed(){
+  const feed = document.getElementById("feed");
+  const list =
+    filter === "all"   ? allPosts :
+    filter === "topic" ? allPosts.filter(p => p.type === "topic" || p.type === "topic_answer") :
+                         allPosts.filter(p => p.type === filter);
+  if(!list.length){
+    feed.innerHTML = '<div class="empty">まだ投稿がありません。<br>右下の「＋ 投稿」から最初の1件をどうぞ。</div>';
+    return;
+  }
+  feed.innerHTML = "";
+  list.forEach(p => feed.appendChild(feedCard(p)));
+}
+function feedCard(p){
+  const el = document.createElement("div");
+  el.className = "card";
+  el.addEventListener("click", () => openDetail(p.id));
+
+  const badge = document.createElement("span");
+  badge.className = "badge";
+  badge.textContent = TYPE_LABEL[p.type];
+  el.appendChild(badge);
+
+  if(p.type === "report"){
+    const q = document.createElement("div");
+    q.className = "q";
+    q.textContent = p.title || "（無題）";
+    const b = document.createElement("div");
+    b.className = "body clamp";
+    b.textContent = p.body;
+    el.append(q, b);
+  }else{
+    const q = document.createElement("div");
+    q.className = "q";
+    q.textContent = p.question;
+    el.appendChild(q);
+    if(p.conditions.length){
+      const ul = document.createElement("ul");
+      ul.className = "conds";
+      p.conditions.forEach(c => { const li = document.createElement("li"); li.textContent = c; ul.appendChild(li); });
+      el.appendChild(ul);
+    }
+    if(p.type === "topic_answer" && p.modelAnswer){
+      const b = document.createElement("div");
+      b.className = "body clamp";
+      b.textContent = "仮ANSWER：" + p.modelAnswer;
+      el.appendChild(b);
+    }
+  }
+
+  const meta = document.createElement("div");
+  meta.className = "meta";
+  const who = document.createElement("span");
+  who.className = "who";
+  who.textContent = "@" + p.nickname;
+  const when = document.createElement("span");
+  when.textContent = relTime(p.createdAt);
+  const like = document.createElement("button");
+  like.className = "like" + (likedSet.has(p.id) ? " on" : "");
+  like.innerHTML = '<span>' + (likedSet.has(p.id) ? "♥" : "♡") + '</span><span>' + p.likes + '</span>';
+  like.disabled = likedSet.has(p.id);
+  like.addEventListener("click", async e => {
+    e.stopPropagation();
+    if(likedSet.has(p.id)) return;
+    markLiked(p.id);
+    p.likes = await apiLike(p.id);
+    renderFeed();
+  });
+  meta.append(who, when, like);
+  el.appendChild(meta);
+  return el;
+}
+
+document.getElementById("filters").addEventListener("click", e => {
+  const b = e.target.closest("button");
+  if(!b) return;
+  filter = b.dataset.f;
+  document.querySelectorAll("#filters button").forEach(x => x.classList.toggle("on", x === b));
+  renderFeed();
+});
+document.getElementById("reload-btn").addEventListener("click", refreshFeed);
+
+/* ---------- 詳細 ---------- */
+let current = null;
+function openDetail(id){
+  const p = allPosts.find(x => x.id === id);
+  if(!p) return;
+  current = p;
+  document.getElementById("d-badge").textContent = TYPE_LABEL[p.type];
+  const c = document.getElementById("d-content");
+  c.innerHTML = "";
+
+  if(p.type === "report"){
+    const h = document.createElement("div");
+    h.className = "card-title";
+    h.style.cssText = "font-size:19px;font-weight:900;line-height:1.5;margin:4px 0 12px;";
+    h.textContent = p.title || "（無題）";
+    const b = document.createElement("div");
+    b.className = "detail-body";
+    b.textContent = p.body;
+    c.append(h, b);
+  }else{
+    const q = document.createElement("div");
+    q.style.cssText = "font-size:20px;font-weight:900;line-height:1.5;margin:4px 0 12px;";
+    q.textContent = p.question;
+    c.appendChild(q);
+    if(p.conditions.length){
+      c.insertAdjacentHTML("beforeend", '<div class="sect-title">条件</div>');
+      const ul = document.createElement("ul");
+      ul.className = "conds";
+      p.conditions.forEach(x => { const li = document.createElement("li"); li.textContent = x; ul.appendChild(li); });
+      c.appendChild(ul);
+    }
+    if(p.type === "topic_answer" && p.modelAnswer){
+      c.insertAdjacentHTML("beforeend", '<div class="sect-title">仮ANSWER（模範解答）</div>');
+      const b = document.createElement("div");
+      b.className = "detail-body";
+      b.textContent = p.modelAnswer;
+      c.appendChild(b);
+    }
+  }
+
+  document.getElementById("d-who").textContent = "@" + p.nickname;
+  document.getElementById("d-when").textContent = relTime(p.createdAt);
+  const dl = document.getElementById("d-like");
+  const liked = likedSet.has(p.id);
+  dl.classList.toggle("on", liked);
+  dl.disabled = liked;
+  dl.querySelector("span").textContent = liked ? "♥" : "♡";
+  document.getElementById("d-likes").textContent = p.likes;
+
+  const playBtn = document.getElementById("d-play");
+  playBtn.hidden = (p.type === "report");
+
+  go("detail");
+}
+document.getElementById("d-like").addEventListener("click", async () => {
+  if(!current || likedSet.has(current.id)) return;
+  markLiked(current.id);
+  current.likes = await apiLike(current.id);
+  openDetail(current.id);
+});
+document.getElementById("d-play").addEventListener("click", () => { if(current) openPlay(current); });
+
+/* ---------- 投稿フォーム ---------- */
+const cType = document.getElementById("c-type");
+function syncComposeFields(){
+  const t = cType.value;
+  document.getElementById("c-topic-fields").hidden = (t === "report");
+  document.getElementById("c-answer-wrap").hidden = (t !== "topic_answer");
+  document.getElementById("c-report-fields").hidden = (t !== "report");
+}
+cType.addEventListener("change", syncComposeFields);
+
+document.getElementById("fab").addEventListener("click", () => {
+  cType.value = "topic";
+  syncComposeFields();
+  ["c-question","c-conditions","c-answer","c-title","c-report","c-nick"].forEach(id => document.getElementById(id).value = "");
+  go("compose");
+});
+
+document.getElementById("c-submit").addEventListener("click", async () => {
+  const t = cType.value;
+  const nick = document.getElementById("c-nick").value.trim() || "名無し";
+  let post;
+  if(t === "report"){
+    const title = document.getElementById("c-title").value.trim();
+    const body = document.getElementById("c-report").value.trim();
+    if(!body){ toast("本文を入力してください"); return; }
+    post = { type:t, title, body, nickname:nick };
+  }else{
+    const question = document.getElementById("c-question").value.trim();
+    const conditions = document.getElementById("c-conditions").value.split("\n").map(s => s.trim()).filter(Boolean);
+    if(!question){ toast("お題を入力してください"); return; }
+    post = { type:t, question, conditions, nickname:nick };
+    if(t === "topic_answer"){
+      const modelAnswer = document.getElementById("c-answer").value.trim();
+      if(!modelAnswer){ toast("仮ANSWERを入力してください"); return; }
+      post.modelAnswer = modelAnswer;
+    }
+  }
+
+  const btn = document.getElementById("c-submit");
+  btn.disabled = true; btn.textContent = "送信中…";
+  try{
+    const saved = await apiCreate(post);
+    allPosts.unshift(saved);
+    filter = "all";
+    document.querySelectorAll("#filters button").forEach(x => x.classList.toggle("on", x.dataset.f === "all"));
+    renderFeed();
+    go("feed");
+    toast(isRemote() ? "投稿しました" : "投稿しました（この端末のみ）");
+  }catch(e){
+    toast("送信に失敗しました");
+  }finally{
+    btn.disabled = false; btn.textContent = "投稿する";
+  }
+});
+
+/* ---------- 遊ぶ（タイマー） ---------- */
+let remaining = 900, ticking = null;
+const pt = document.getElementById("play-timer");
+const ptog = document.getElementById("play-toggle");
+function fmt(s){ const m = Math.floor(s/60); return m + ":" + String(s%60).padStart(2,"0"); }
+function renderT(){ pt.textContent = fmt(Math.max(0, remaining)); }
+function startTimer(){
+  if(ticking || remaining <= 0) return;
+  ticking = setInterval(() => {
+    remaining--; renderT();
+    if(remaining <= 0){ stopTimer(); beep(); beep(300); }
+  }, 1000);
+  ptog.textContent = "一時停止";
+}
+function stopTimer(){ if(ticking){ clearInterval(ticking); ticking = null; } ptog.textContent = remaining <= 0 ? "スタート" : "再開"; }
+function resetTimer(){ stopTimer(); remaining = 900; ptog.textContent = "スタート"; renderT(); }
+ptog.addEventListener("click", () => ticking ? stopTimer() : startTimer());
+document.getElementById("play-reset").addEventListener("click", resetTimer);
+
+let audioCtx = null;
+function beep(delay){
+  setTimeout(() => {
+    try{
+      audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+      const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+      o.connect(g); g.connect(audioCtx.destination);
+      o.type = "sine"; o.frequency.value = 880;
+      const now = audioCtx.currentTime;
+      g.gain.setValueAtTime(0.0001, now);
+      g.gain.exponentialRampToValueAtTime(0.35, now + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, now + 0.5);
+      o.start(now); o.stop(now + 0.55);
+    }catch(e){}
+  }, delay || 0);
+}
+
+function openPlay(p){
+  document.getElementById("play-q").textContent = p.question;
+  const ul = document.getElementById("play-conds");
+  ul.innerHTML = "";
+  p.conditions.forEach(c => { const li = document.createElement("li"); li.textContent = c; ul.appendChild(li); });
+  const rev = document.getElementById("play-reveal");
+  const ans = document.getElementById("play-answer");
+  ans.hidden = true;
+  ans.textContent = p.modelAnswer || "";
+  rev.hidden = !p.modelAnswer;
+  rev.onclick = () => { ans.hidden = false; rev.hidden = true; };
+  resetTimer();
+  go("play");
+}
+document.getElementById("play-back").addEventListener("click", () => { if(current) openDetail(current.id); else go("feed"); });
+
+/* ---------- オンボーディング / チュートリアル ---------- */
+const ONBOARD_KEY = "moshimoshi-community/onboarded";
+function isOnboarded(){ try{ return !!localStorage.getItem(ONBOARD_KEY); }catch(e){ return false; } }
+function setOnboarded(){ try{ localStorage.setItem(ONBOARD_KEY, "1"); }catch(e){} }
+
+const SLIDES = [
+  { n:"1 / 5", h:"もしもコミュニティとは", p:"「もしも○○だったら？」というお題を、みんなで投稿し合う場所です。<br>自作のお題・模範解答・遊んだ結果をシェアできます。" },
+  { n:"2 / 5", h:"フィードを見る", p:"投稿は新しい順に並びます。<br>上のボタンで種類をしぼれます（お題／仮ANSWERつき／名回答・プレイ結果）。<br>気に入ったら ♥ で「いいね」。" },
+  { n:"3 / 5", h:"お題で遊ぶ", p:"気になるお題をタップ →「このお題で遊ぶ」。<br>15分タイマーで話し合って、仮ANSWERつきのお題なら終わったあとに模範解答を開けます。" },
+  { n:"4 / 5", h:"投稿する", p:"右下の「＋ 投稿」から。<br>「自作のお題」「お題＋仮ANSWER」「名回答・プレイ結果」の3種類。<br>ニックネームは名無しでもOK。" },
+  { n:"5 / 5", h:"たった2つの原則", p:"① 意味のない話をする（オチも教訓もいらない）<br>② 現実的に考えなくていい（物理法則もお金も無視）<br>これだけ守れば大丈夫です。" }
+];
+let slideIdx = 0;
+function renderSlide(){
+  const s = SLIDES[slideIdx];
+  document.getElementById("tut-slide").innerHTML =
+    '<div class="n">' + s.n + '</div><h2>' + s.h + '</h2><p>' + s.p + '</p>';
+  const dots = document.getElementById("tut-dots");
+  dots.innerHTML = "";
+  SLIDES.forEach((_, i) => {
+    const d = document.createElement("i");
+    if(i === slideIdx) d.className = "on";
+    dots.appendChild(d);
+  });
+  document.getElementById("tut-next").textContent = (slideIdx === SLIDES.length - 1) ? "はじめる" : "次へ";
+  document.getElementById("tut-prev").style.visibility = (slideIdx === 0) ? "hidden" : "visible";
+}
+function startTutorial(){ slideIdx = 0; renderSlide(); go("tutorial"); }
+function finishOnboard(){ setOnboarded(); go("feed"); }
+
+document.getElementById("ob-yes").addEventListener("click", startTutorial);
+document.getElementById("ob-no").addEventListener("click", finishOnboard);
+document.getElementById("howto-btn").addEventListener("click", startTutorial);
+document.getElementById("tut-skip").addEventListener("click", finishOnboard);
+document.getElementById("tut-prev").addEventListener("click", () => { if(slideIdx > 0){ slideIdx--; renderSlide(); } });
+document.getElementById("tut-next").addEventListener("click", () => {
+  if(slideIdx < SLIDES.length - 1){ slideIdx++; renderSlide(); }
+  else finishOnboard();
+});
+
+/* ---------- 起動 ---------- */
+document.getElementById("demo-note").hidden = isRemote();
+refreshFeed();
+go(isOnboarded() ? "feed" : "onboard");
+</script>
+</body>
+</html>
