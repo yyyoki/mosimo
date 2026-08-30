@@ -200,9 +200,40 @@
   .slide h2{ font-size:clamp(20px,6vw,26px); font-weight:900; line-height:1.5; margin:14px 0 18px; }
   .slide p{ font-size:14px; font-weight:700; line-height:2; color:var(--dim); }
   .link-row{ display:flex; justify-content:space-between; align-items:center; }
+
+  /* 管理者モード */
+  .admin-bar{
+    position:fixed; top:0; left:0; right:0; z-index:55;
+    background:var(--fg); color:var(--bg);
+    font-size:12px; font-weight:900; letter-spacing:.14em;
+    padding:8px 16px;
+    display:flex; align-items:center; justify-content:space-between;
+  }
+  .admin-bar button{
+    background:none; border:1px solid var(--bg); color:var(--bg);
+    font:inherit; font-weight:800; font-size:11px; letter-spacing:.08em;
+    padding:4px 12px; cursor:pointer;
+  }
+  body.admin #app{ padding-top:46px; }
+  body.admin::after{ top:calc(9px + 38px); }
+  .admin-actions{ display:flex; gap:8px; margin-top:10px; padding-top:10px; border-top:1px solid var(--hair); }
+  .admin-actions button{
+    flex:1;
+    border:1px solid var(--line); background:transparent; color:var(--fg);
+    font:inherit; font-weight:800; font-size:12px; letter-spacing:.06em;
+    padding:8px; cursor:pointer;
+  }
+  .admin-actions button:active{ background:var(--panel); }
+  .admin-actions button.danger{ border-style:dashed; }
 </style>
 </head>
 <body>
+
+<div class="admin-bar" id="admin-bar" hidden>
+  <span>管理者モード</span>
+  <button id="admin-exit">終了</button>
+</div>
+
 <div id="app">
 
   <!-- はじめての人へ（チュートリアルを聞くか） -->
@@ -272,6 +303,8 @@
     </div>
     <div class="actions">
       <button class="btn" id="d-play" hidden>このお題で遊ぶ</button>
+      <button class="btn ghost sm" id="d-edit" hidden>この投稿を編集</button>
+      <button class="btn ghost sm" id="d-delete" hidden>この投稿を削除</button>
       <button class="btn ghost sm" data-go="feed">一覧にもどる</button>
     </div>
   </section>
@@ -279,7 +312,7 @@
   <!-- 投稿 -->
   <section class="screen" id="screen-compose" data-screen="compose">
     <button class="link" data-go="feed">‹ やめる</button>
-    <div class="top"><h1>投稿する</h1></div>
+    <div class="top"><h1 id="compose-title">投稿する</h1></div>
 
     <label class="fld">
       <span class="lab">種類</span>
@@ -353,14 +386,34 @@
 
 <script>
 /* =========================================================
-   設定 — Google Apps Script のウェブアプリURLをここに貼ると、
-   投稿がスプレッドシートに保存され、みんなで共有できます。
-   空のままだとこの端末内だけのデモモードで動きます。
+   設定
+   - GAS_URL   : Google Apps Script のウェブアプリURL。空だと端末内デモモード
+   - GA4_ID    : Google Analytics 4 の測定ID（例 "G-XXXXXXXXXX"）。空だと計測なし
+   - ADMIN_KEY : 管理者モードの合言葉。GAS を使う場合は
+                 スクリプトプロパティ ADMIN_KEY と同じ値にしてください
    （セットアップ手順は同梱の README.md）
    ========================================================= */
 const CONFIG = {
-  GAS_URL: ""
+  GAS_URL: "",
+  GA4_ID: "",
+  ADMIN_KEY: ""
 };
+
+/* ---------- Google Analytics 4 ---------- */
+function initGA(){
+  if(!CONFIG.GA4_ID) return;
+  const s = document.createElement("script");
+  s.async = true;
+  s.src = "https://www.googletagmanager.com/gtag/js?id=" + encodeURIComponent(CONFIG.GA4_ID);
+  document.head.appendChild(s);
+  window.dataLayer = window.dataLayer || [];
+  window.gtag = function(){ dataLayer.push(arguments); };
+  gtag("js", new Date());
+  gtag("config", CONFIG.GA4_ID);
+}
+function track(name, params){
+  try{ if(window.gtag) gtag("event", name, params || {}); }catch(e){}
+}
 
 const TYPE_LABEL = {
   topic: "お題",
@@ -517,6 +570,46 @@ async function apiLike(id){
   if(p){ p.likes = (p.likes|0) + 1; saveLocal(posts); return p.likes; }
   return 0;
 }
+async function apiAdminCheck(key){
+  if(!isRemote()) return (!CONFIG.ADMIN_KEY || key === CONFIG.ADMIN_KEY);
+  try{
+    const res = await fetch(CONFIG.GAS_URL, { method:"POST", body: JSON.stringify({ action:"admin_check", adminKey:key }) });
+    const data = await res.json();
+    return !!data.ok;
+  }catch(e){ return false; }
+}
+async function apiUpdate(id, patch){
+  if(isRemote()){
+    const res = await fetch(CONFIG.GAS_URL, {
+      method:"POST",
+      body: JSON.stringify({ action:"update", id, adminKey, patch })
+    });
+    const data = await res.json();
+    if(!data.ok) throw new Error(data.error || "update failed");
+    return normalize(data.post);
+  }
+  const posts = loadLocal();
+  const idx = posts.findIndex(x => x.id === id);
+  if(idx < 0) throw new Error("not found");
+  posts[idx] = normalize(Object.assign({}, posts[idx], patch, {
+    id, createdAt: posts[idx].createdAt, likes: posts[idx].likes | 0
+  }));
+  saveLocal(posts);
+  return posts[idx];
+}
+async function apiDelete(id){
+  if(isRemote()){
+    const res = await fetch(CONFIG.GAS_URL, {
+      method:"POST",
+      body: JSON.stringify({ action:"delete", id, adminKey })
+    });
+    const data = await res.json();
+    if(!data.ok) throw new Error(data.error || "delete failed");
+    return true;
+  }
+  saveLocal(loadLocal().filter(x => x.id !== id));
+  return true;
+}
 function normalize(p){
   p = p || {};
   return {
@@ -558,6 +651,88 @@ function relTime(ts){
   if(s < 3600) return Math.floor(s/60) + "分前";
   if(s < 86400) return Math.floor(s/3600) + "時間前";
   return Math.floor(s/86400) + "日前";
+}
+
+/* ---------- 管理者モード ---------- */
+const ADMINKEY_KEY = "moshimoshi-community/adminkey";
+let admin = false;
+let adminKey = "";
+let editingId = null;
+
+function applyAdminUI(){
+  document.body.classList.toggle("admin", admin);
+  document.getElementById("admin-bar").hidden = !admin;
+  if(allPosts.length) renderFeed();
+  const act = document.querySelector(".screen.active");
+  if(act && act.dataset.screen === "detail" && current) openDetail(current.id);
+}
+async function openAdminLogin(){
+  if(admin) return;
+  const key = prompt("管理者の合言葉を入力してください");
+  if(key == null || key === "") return;
+  const ok = await apiAdminCheck(key);
+  if(!ok){ toast("合言葉が違います"); return; }
+  adminKey = key;
+  admin = true;
+  try{ sessionStorage.setItem(ADMINKEY_KEY, key); }catch(e){}
+  applyAdminUI();
+  track("admin_login");
+  toast("管理者モード ON");
+}
+function exitAdmin(){
+  admin = false;
+  adminKey = "";
+  try{ sessionStorage.removeItem(ADMINKEY_KEY); }catch(e){}
+  applyAdminUI();
+  toast("管理者モードを終了しました");
+}
+function onUnauthorized(){
+  toast("権限が確認できませんでした。もう一度ログインしてください");
+  exitAdmin();
+}
+document.getElementById("admin-exit").addEventListener("click", exitAdmin);
+
+/* ロゴを5回すばやくタップで管理者ログイン */
+(() => {
+  let n = 0, t = null;
+  document.querySelector("#screen-feed .top h1").addEventListener("click", () => {
+    n++;
+    clearTimeout(t);
+    t = setTimeout(() => { n = 0; }, 1400);
+    if(n >= 5){ n = 0; openAdminLogin(); }
+  });
+})();
+
+function startEdit(p){
+  editingId = p.id;
+  const ct = document.getElementById("c-type");
+  ct.value = p.type;
+  ct.disabled = true;
+  syncComposeFields();
+  document.getElementById("c-question").value = p.question || "";
+  document.getElementById("c-conditions").value = (p.conditions || []).join("\n");
+  document.getElementById("c-answer").value = p.modelAnswer || "";
+  document.getElementById("c-title").value = p.title || "";
+  document.getElementById("c-report").value = p.body || "";
+  document.getElementById("c-nick").value = (p.nickname && p.nickname !== "名無し") ? p.nickname : "";
+  document.getElementById("compose-title").textContent = "投稿を編集";
+  document.getElementById("c-submit").textContent = "更新する";
+  go("compose");
+}
+async function adminDelete(p){
+  const label = p.type === "report" ? (p.title || "この投稿") : p.question;
+  if(!confirm("削除しますか？（元に戻せません）\n\n" + label)) return;
+  try{
+    await apiDelete(p.id);
+    allPosts = allPosts.filter(x => x.id !== p.id);
+    track("post_delete", { post_type: p.type });
+    const act = document.querySelector(".screen.active");
+    if(act && act.dataset.screen === "detail") go("feed"); else renderFeed();
+    toast("削除しました");
+  }catch(e){
+    if(String(e.message).indexOf("unauthorized") >= 0) onUnauthorized();
+    else toast("削除に失敗しました");
+  }
 }
 
 /* ---------- フィード ---------- */
@@ -643,9 +818,24 @@ function feedCard(p){
     markLiked(p.id);
     p.likes = await apiLike(p.id);
     renderFeed();
+    track("post_like", { post_type: p.type });
   });
   meta.append(who, when, like);
   el.appendChild(meta);
+
+  if(admin){
+    const bar = document.createElement("div");
+    bar.className = "admin-actions";
+    const edit = document.createElement("button");
+    edit.textContent = "編集";
+    edit.addEventListener("click", e => { e.stopPropagation(); startEdit(p); });
+    const del = document.createElement("button");
+    del.textContent = "削除";
+    del.className = "danger";
+    del.addEventListener("click", e => { e.stopPropagation(); adminDelete(p); });
+    bar.append(edit, del);
+    el.appendChild(bar);
+  }
   return el;
 }
 
@@ -655,6 +845,7 @@ document.getElementById("filters").addEventListener("click", e => {
   filter = b.dataset.f;
   document.querySelectorAll("#filters button").forEach(x => x.classList.toggle("on", x === b));
   renderFeed();
+  track("filter_change", { filter });
 });
 document.getElementById("reload-btn").addEventListener("click", refreshFeed);
 
@@ -709,16 +900,24 @@ function openDetail(id){
 
   const playBtn = document.getElementById("d-play");
   playBtn.hidden = (p.type === "report");
+  document.getElementById("d-edit").hidden = !admin;
+  document.getElementById("d-delete").hidden = !admin;
 
   go("detail");
+  track("open_post", { post_type: p.type });
 }
+document.getElementById("d-edit").addEventListener("click", () => { if(current) startEdit(current); });
+document.getElementById("d-delete").addEventListener("click", () => { if(current) adminDelete(current); });
 document.getElementById("d-like").addEventListener("click", async () => {
   if(!current || likedSet.has(current.id)) return;
   markLiked(current.id);
   current.likes = await apiLike(current.id);
+  track("post_like", { post_type: current.type });
   openDetail(current.id);
 });
-document.getElementById("d-play").addEventListener("click", () => { if(current) openPlay(current); });
+document.getElementById("d-play").addEventListener("click", () => {
+  if(current){ track("play_start", { post_type: current.type }); openPlay(current); }
+});
 
 /* ---------- 投稿フォーム ---------- */
 const cType = document.getElementById("c-type");
@@ -731,9 +930,13 @@ function syncComposeFields(){
 cType.addEventListener("change", syncComposeFields);
 
 document.getElementById("fab").addEventListener("click", () => {
+  editingId = null;
+  cType.disabled = false;
   cType.value = "topic";
   syncComposeFields();
   ["c-question","c-conditions","c-answer","c-title","c-report","c-nick"].forEach(id => document.getElementById(id).value = "");
+  document.getElementById("compose-title").textContent = "投稿する";
+  document.getElementById("c-submit").textContent = "投稿する";
   go("compose");
 });
 
@@ -759,19 +962,35 @@ document.getElementById("c-submit").addEventListener("click", async () => {
   }
 
   const btn = document.getElementById("c-submit");
+  const editing = editingId;
   btn.disabled = true; btn.textContent = "送信中…";
   try{
-    const saved = await apiCreate(post);
-    allPosts.unshift(saved);
-    filter = "all";
-    document.querySelectorAll("#filters button").forEach(x => x.classList.toggle("on", x.dataset.f === "all"));
-    renderFeed();
-    go("feed");
-    toast(isRemote() ? "投稿しました" : "投稿しました（この端末のみ）");
+    if(editing){
+      const updated = await apiUpdate(editing, post);
+      const idx = allPosts.findIndex(x => x.id === editing);
+      if(idx >= 0) allPosts[idx] = updated;
+      editingId = null;
+      cType.disabled = false;
+      track("post_edit", { post_type: updated.type });
+      renderFeed();
+      go("feed");
+      toast("更新しました");
+    }else{
+      const saved = await apiCreate(post);
+      allPosts.unshift(saved);
+      filter = "all";
+      document.querySelectorAll("#filters button").forEach(x => x.classList.toggle("on", x.dataset.f === "all"));
+      track("post_create", { post_type: saved.type });
+      renderFeed();
+      go("feed");
+      toast(isRemote() ? "投稿しました" : "投稿しました（この端末のみ）");
+    }
   }catch(e){
-    toast("送信に失敗しました");
+    if(String(e.message).indexOf("unauthorized") >= 0) onUnauthorized();
+    else toast("送信に失敗しました");
   }finally{
-    btn.disabled = false; btn.textContent = "投稿する";
+    btn.disabled = false;
+    btn.textContent = editingId ? "更新する" : "投稿する";
   }
 });
 
@@ -857,18 +1076,31 @@ function renderSlide(){
 function startTutorial(){ slideIdx = 0; renderSlide(); go("tutorial"); }
 function finishOnboard(){ setOnboarded(); go("feed"); }
 
-document.getElementById("ob-yes").addEventListener("click", startTutorial);
-document.getElementById("ob-no").addEventListener("click", finishOnboard);
-document.getElementById("howto-btn").addEventListener("click", startTutorial);
-document.getElementById("tut-skip").addEventListener("click", finishOnboard);
+document.getElementById("ob-yes").addEventListener("click", () => { track("tutorial_start", { from: "onboard" }); startTutorial(); });
+document.getElementById("ob-no").addEventListener("click", () => { track("tutorial_skip"); finishOnboard(); });
+document.getElementById("howto-btn").addEventListener("click", () => { track("tutorial_start", { from: "feed" }); startTutorial(); });
+document.getElementById("tut-skip").addEventListener("click", () => { track("tutorial_skip"); finishOnboard(); });
 document.getElementById("tut-prev").addEventListener("click", () => { if(slideIdx > 0){ slideIdx--; renderSlide(); } });
 document.getElementById("tut-next").addEventListener("click", () => {
   if(slideIdx < SLIDES.length - 1){ slideIdx++; renderSlide(); }
-  else finishOnboard();
+  else { track("tutorial_complete"); finishOnboard(); }
 });
 
 /* ---------- 起動 ---------- */
+initGA();
 document.getElementById("demo-note").hidden = isRemote();
+(function restoreAdmin(){
+  let sk = "";
+  try{ sk = sessionStorage.getItem(ADMINKEY_KEY) || ""; }catch(e){}
+  if(!sk) return;
+  adminKey = sk;
+  if(!isRemote()){
+    if(!CONFIG.ADMIN_KEY || sk === CONFIG.ADMIN_KEY){ admin = true; applyAdminUI(); }
+  }else{
+    admin = true;               // 楽観的に復帰。書き込み時にサーバーが再検証する
+    applyAdminUI();
+  }
+})();
 refreshFeed();
 go(isOnboarded() ? "feed" : "onboard");
 </script>

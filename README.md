@@ -16,9 +16,26 @@
 | 詳細 | 1件の全文。お題系は「このお題で遊ぶ」ボタン |
 | 投稿 | 種類を選んで投稿（右下「＋ 投稿」）。お題／お題＋仮ANSWER／名回答・プレイ結果でフォームが変わる |
 | 遊ぶ | コミュニティのお題を Q＋条件＋15分タイマーで。仮ANSWER付きなら終了後に開ける |
+| 管理者モード | 合言葉を知っている人だけ。全投稿の編集・削除ができる |
 
 いいねの重複は端末単位で防止（`moshimoshi-community/liked`）。
 チュートリアルを見たかどうかは `moshimoshi-community/onboarded` で記録（消すと初回画面が再表示）。
+
+## 管理者モード
+
+- **入り方**：フィード画面のタイトル「もしもコミュニティ」を**すばやく5回タップ** → 合言葉を入力
+- **できること**：各カード／詳細に「編集」「削除」ボタンが出る。編集は投稿フォームを再利用（種類は変更不可）
+- **合言葉の設定**：
+  - デモモード（`CONFIG.GAS_URL` 空）：`CONFIG.ADMIN_KEY` が空なら何を入れても通る。値を入れるとその文字列のみ通る
+  - GAS 接続時：GAS の **スクリプトプロパティ `ADMIN_KEY`** が本当の鍵。同じ値を `CONFIG.ADMIN_KEY` にも入れる（クライアント側はUI表示の切り替え用、実際の書き込み許可はサーバーが判定）
+- ログイン状態は `sessionStorage`（タブを閉じると解除）。上部バーの「終了」でも解除
+- ⚠ `CONFIG.ADMIN_KEY` は公開HTMLに載るため、厳密な秘匿にはなりません。真に守りたい場合は `CONFIG.ADMIN_KEY` を空のままにし、GAS のスクリプトプロパティのみで運用してください（毎回サーバー確認が入ります）
+
+## アクセス解析（Google Analytics 4）
+
+- `CONFIG.GA4_ID` に測定ID（`G-XXXXXXXXXX`）を入れると gtag.js を自動読み込み。空なら何も送信しない
+- 送信しているイベント：`tutorial_start` / `tutorial_complete` / `tutorial_skip` / `filter_change` / `open_post` / `post_like` / `play_start` / `post_create` / `post_edit` / `post_delete` / `admin_login`
+- ボタンごとの回数を増やしたい場合は、該当の click ハンドラに `track("イベント名", { 任意パラメータ })` を1行足すだけ
 
 ## 初期データ
 
