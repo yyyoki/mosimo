@@ -149,6 +149,7 @@ function doPost(e) {
       for (var u = 1; u < uvals.length; u++) {
         if (String(uvals[u][0]) === uid) {
           var rn = u + 1;
+          if (patch.createdAt != null && !isNaN(Number(patch.createdAt))) sh.getRange(rn, 2).setValue(Number(patch.createdAt));
           if (patch.type && ['topic', 'topic_answer', 'report'].indexOf(patch.type) >= 0) sh.getRange(rn, 3).setValue(patch.type);
           if (patch.question != null) sh.getRange(rn, 4).setValue(String(patch.question).slice(0, 200));
           if (patch.conditions != null) sh.getRange(rn, 5).setValue(JSON.stringify((Array.isArray(patch.conditions) ? patch.conditions : []).map(function (c) { return String(c).slice(0, 120); }).slice(0, 5)));

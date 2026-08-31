@@ -15,6 +15,7 @@
     --panel:#141414;
   }
   *{ box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
+  [hidden]{ display:none !important; }
   html,body{ height:100%; }
   body{
     background:var(--bg);
@@ -226,6 +227,7 @@
   @media (min-width:600px){
     .admin-bar{ padding-left:max(16px, calc(50% - 280px + 22px)); padding-right:max(16px, calc(50% - 280px + 22px)); }
   }
+  .admin-bar .admin-bar-actions{ display:flex; gap:8px; }
   .admin-bar button{
     background:none; border:1px solid var(--bg); color:var(--bg);
     font:inherit; font-weight:800; font-size:11px; letter-spacing:.08em;
@@ -233,22 +235,41 @@
   }
   body.admin #app{ padding-top:46px; }
   body.admin::after{ top:calc(9px + 38px); }
-  .admin-actions{ display:flex; gap:8px; margin-top:12px; padding-top:12px; border-top:1px solid var(--fg); }
-  .admin-actions button{
-    flex:1;
-    border:1px solid var(--fg); background:transparent; color:var(--fg);
-    font:inherit; font-weight:900; font-size:12.5px; letter-spacing:.1em;
-    padding:9px; cursor:pointer;
+
+  /* 管理画面 */
+  .admin-hint{ font-size:12px; font-weight:700; color:var(--dim); margin:2px 0 14px; line-height:1.6; }
+  .admin-list{ display:flex; flex-direction:column; gap:10px; flex:1; }
+  .adm-row{ border:1px solid var(--line); padding:12px 13px; }
+  .adm-row .adm-badge{
+    display:inline-block; border:1px solid var(--dim); color:var(--dim);
+    font-size:10px; font-weight:900; letter-spacing:.1em; padding:2px 6px; margin-bottom:8px;
   }
-  .admin-actions button:hover{ background:var(--fg); color:var(--bg); }
-  .admin-actions button.danger{ border-style:dashed; }
+  .adm-row .adm-t{
+    font-size:14px; font-weight:800; line-height:1.55;
+    display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;
+  }
+  .adm-row .adm-sub{ font-size:11px; font-weight:700; color:var(--dim); margin-top:6px; }
+  .adm-actions{ display:flex; gap:6px; margin-top:11px; }
+  .adm-actions button{
+    border:1px solid var(--fg); background:transparent; color:var(--fg);
+    font:inherit; font-weight:900; font-size:12px; letter-spacing:.06em;
+    padding:7px 0; cursor:pointer; flex:1;
+  }
+  .adm-actions button.nudge{ flex:0 0 40px; letter-spacing:0; }
+  .adm-actions button:hover{ background:var(--fg); color:var(--bg); }
+  .adm-actions button.danger{ border-style:dashed; }
+  .adm-actions button:disabled{ opacity:.3; cursor:default; }
+  .adm-actions button:disabled:hover{ background:transparent; color:var(--fg); }
 </style>
 </head>
 <body>
 
 <div class="admin-bar" id="admin-bar" hidden>
   <span>管理者モード</span>
-  <button id="admin-exit">終了</button>
+  <span class="admin-bar-actions">
+    <button id="admin-manage">投稿を管理</button>
+    <button id="admin-exit">終了</button>
+  </span>
 </div>
 
 <div id="app">
@@ -257,12 +278,12 @@
   <section class="screen active" id="screen-onboard" data-screen="onboard">
     <div class="ob-center">
       <span class="kicker">MOSHIMO COMMUNITY</span>
-      <h1>もしもコミュニティ<br>へようこそ</h1>
-      <p>はじめてですか？<br>使い方を1分だけ説明します。<br>聞かなくても、あとから「使い方」で見られます。</p>
+      <h1>もしもコミュニティ</h1>
+      <p>「もしも○○だったら？」を<br>みんなで投稿し合う場所です。<br><br>使い方を1分で説明します。聞きますか？</p>
     </div>
     <div class="actions">
       <button class="btn" id="ob-yes">使い方を聞く</button>
-      <button class="btn ghost sm" id="ob-no">聞かずに始める</button>
+      <button class="btn ghost sm" id="ob-no">スキップして始める</button>
     </div>
   </section>
 
@@ -308,6 +329,25 @@
     </div>
   </section>
 
+  <!-- 管理者専用：投稿の管理 -->
+  <section class="screen" id="screen-admin" data-screen="admin">
+    <div class="top">
+      <h1>投稿の管理</h1>
+      <button class="link" data-go="feed" style="flex:none;">フィードへ ›</button>
+    </div>
+    <p class="admin-hint" id="admin-count">読み込み中…</p>
+    <div class="filters" id="admin-filters">
+      <button data-f="all" class="on">すべて</button>
+      <button data-f="topic">お題</button>
+      <button data-f="topic_answer">仮ANSWERつき</button>
+      <button data-f="report">名回答・プレイ結果</button>
+    </div>
+    <div class="admin-list" id="admin-list"></div>
+    <div class="actions">
+      <button class="btn ghost sm" id="admin-quit">管理者モードを終了する</button>
+    </div>
+  </section>
+
   <!-- 詳細 -->
   <section class="screen" id="screen-detail" data-screen="detail">
     <button class="link" data-go="feed">‹ 一覧にもどる</button>
@@ -320,15 +360,13 @@
     </div>
     <div class="actions">
       <button class="btn" id="d-play" hidden>このお題で遊ぶ</button>
-      <button class="btn ghost sm" id="d-edit" hidden>この投稿を編集</button>
-      <button class="btn ghost sm" id="d-delete" hidden>この投稿を削除</button>
       <button class="btn ghost sm" data-go="feed">一覧にもどる</button>
     </div>
   </section>
 
   <!-- 投稿 -->
   <section class="screen" id="screen-compose" data-screen="compose">
-    <button class="link" data-go="feed">‹ やめる</button>
+    <button class="link" id="compose-cancel">‹ やめる</button>
     <div class="top"><h1 id="compose-title">投稿する</h1></div>
 
     <label class="fld">
@@ -609,7 +647,9 @@ async function apiUpdate(id, patch){
   const idx = posts.findIndex(x => x.id === id);
   if(idx < 0) throw new Error("not found");
   posts[idx] = normalize(Object.assign({}, posts[idx], patch, {
-    id, createdAt: posts[idx].createdAt, likes: posts[idx].likes | 0
+    id,
+    createdAt: patch.createdAt != null ? Number(patch.createdAt) : posts[idx].createdAt,
+    likes: posts[idx].likes | 0
   }));
   saveLocal(posts);
   return posts[idx];
@@ -676,15 +716,17 @@ let admin = false;
 let adminKey = "";
 let editingId = null;
 
+let adminFilter = "all";
+
 function applyAdminUI(){
   document.body.classList.toggle("admin", admin);
   document.getElementById("admin-bar").hidden = !admin;
-  if(allPosts.length) renderFeed();
   const act = document.querySelector(".screen.active");
-  if(act && act.dataset.screen === "detail" && current) openDetail(current.id);
+  if(!admin && act && act.dataset.screen === "admin"){ go("feed"); return; }
+  if(admin && act && act.dataset.screen === "admin") renderAdminList();
 }
 async function openAdminLogin(){
-  if(admin) return;
+  if(admin){ go("admin"); renderAdminList(); return; }
   const key = prompt("管理者の合言葉を入力してください");
   if(key == null || key === "") return;
   const ok = await apiAdminCheck(key);
@@ -694,6 +736,8 @@ async function openAdminLogin(){
   try{ sessionStorage.setItem(ADMINKEY_KEY, key); }catch(e){}
   applyAdminUI();
   track("admin_login");
+  go("admin");
+  renderAdminList();
   toast("管理者モード ON");
 }
 function exitAdmin(){
@@ -701,6 +745,7 @@ function exitAdmin(){
   adminKey = "";
   try{ sessionStorage.removeItem(ADMINKEY_KEY); }catch(e){}
   applyAdminUI();
+  go("feed");
   toast("管理者モードを終了しました");
 }
 function onUnauthorized(){
@@ -708,6 +753,8 @@ function onUnauthorized(){
   exitAdmin();
 }
 document.getElementById("admin-exit").addEventListener("click", exitAdmin);
+document.getElementById("admin-quit").addEventListener("click", exitAdmin);
+document.getElementById("admin-manage").addEventListener("click", () => { go("admin"); renderAdminList(); });
 
 /* ロゴを5回すばやくタップで管理者ログイン */
 (() => {
@@ -719,6 +766,81 @@ document.getElementById("admin-exit").addEventListener("click", exitAdmin);
     if(n >= 5){ n = 0; openAdminLogin(); }
   });
 })();
+
+document.getElementById("admin-filters").addEventListener("click", e => {
+  const b = e.target.closest("button");
+  if(!b) return;
+  adminFilter = b.dataset.f;
+  document.querySelectorAll("#admin-filters button").forEach(x => x.classList.toggle("on", x === b));
+  renderAdminList();
+});
+
+function adminSorted(){
+  return [...allPosts].sort((a, b) => b.createdAt - a.createdAt);
+}
+function renderAdminList(){
+  const wrap = document.getElementById("admin-list");
+  const sorted = adminSorted();
+  const list = adminFilter === "all"
+    ? sorted
+    : adminFilter === "topic"
+      ? sorted.filter(p => p.type === "topic" || p.type === "topic_answer")
+      : sorted.filter(p => p.type === adminFilter);
+  document.getElementById("admin-count").textContent =
+    "全 " + allPosts.length + " 件" + (adminFilter === "all" ? "" : "／表示 " + list.length + " 件");
+  wrap.innerHTML = "";
+  if(!list.length){ wrap.innerHTML = '<div class="empty">該当する投稿がありません。</div>'; return; }
+  list.forEach(p => {
+    const posInAll = sorted.findIndex(x => x.id === p.id);
+    const row = document.createElement("div");
+    row.className = "adm-row";
+    const badge = document.createElement("span");
+    badge.className = "adm-badge";
+    badge.textContent = TYPE_LABEL[p.type];
+    const t = document.createElement("div");
+    t.className = "adm-t";
+    t.textContent = p.type === "report" ? (p.title || "（無題）") : p.question;
+    const sub = document.createElement("div");
+    sub.className = "adm-sub";
+    sub.textContent = "@" + p.nickname + "　♥" + p.likes + "　" + relTime(p.createdAt);
+    const acts = document.createElement("div");
+    acts.className = "adm-actions";
+    const up = document.createElement("button");
+    up.className = "nudge"; up.textContent = "↑"; up.disabled = (posInAll === 0);
+    up.addEventListener("click", () => adminReorder(p.id, -1));
+    const down = document.createElement("button");
+    down.className = "nudge"; down.textContent = "↓"; down.disabled = (posInAll === sorted.length - 1);
+    down.addEventListener("click", () => adminReorder(p.id, 1));
+    const edit = document.createElement("button");
+    edit.textContent = "編集";
+    edit.addEventListener("click", () => startEdit(p));
+    const del = document.createElement("button");
+    del.className = "danger"; del.textContent = "削除";
+    del.addEventListener("click", () => adminDelete(p));
+    acts.append(up, down, edit, del);
+    row.append(badge, t, sub, acts);
+    wrap.appendChild(row);
+  });
+}
+async function adminReorder(id, dir){
+  const sorted = adminSorted();
+  const i = sorted.findIndex(p => p.id === id);
+  const j = i + dir;
+  if(j < 0 || j >= sorted.length) return;
+  const a = sorted[i], b = sorted[j];
+  const ca = a.createdAt, cb = b.createdAt;
+  if(ca === cb) return;
+  try{
+    await apiUpdate(a.id, { createdAt: cb });
+    await apiUpdate(b.id, { createdAt: ca });
+    allPosts.forEach(p => { if(p.id === a.id) p.createdAt = cb; if(p.id === b.id) p.createdAt = ca; });
+    track("post_reorder");
+    renderAdminList();
+  }catch(e){
+    if(String(e.message).indexOf("unauthorized") >= 0) onUnauthorized();
+    else toast("並び替えに失敗しました");
+  }
+}
 
 function startEdit(p){
   editingId = p.id;
@@ -743,8 +865,8 @@ async function adminDelete(p){
     await apiDelete(p.id);
     allPosts = allPosts.filter(x => x.id !== p.id);
     track("post_delete", { post_type: p.type });
-    const act = document.querySelector(".screen.active");
-    if(act && act.dataset.screen === "detail") go("feed"); else renderFeed();
+    renderAdminList();
+    renderFeed();
     toast("削除しました");
   }catch(e){
     if(String(e.message).indexOf("unauthorized") >= 0) onUnauthorized();
@@ -839,20 +961,6 @@ function feedCard(p){
   });
   meta.append(who, when, like);
   el.appendChild(meta);
-
-  if(admin){
-    const bar = document.createElement("div");
-    bar.className = "admin-actions";
-    const edit = document.createElement("button");
-    edit.textContent = "編集";
-    edit.addEventListener("click", e => { e.stopPropagation(); startEdit(p); });
-    const del = document.createElement("button");
-    del.textContent = "削除";
-    del.className = "danger";
-    del.addEventListener("click", e => { e.stopPropagation(); adminDelete(p); });
-    bar.append(edit, del);
-    el.appendChild(bar);
-  }
   return el;
 }
 
@@ -917,14 +1025,10 @@ function openDetail(id){
 
   const playBtn = document.getElementById("d-play");
   playBtn.hidden = (p.type === "report");
-  document.getElementById("d-edit").hidden = !admin;
-  document.getElementById("d-delete").hidden = !admin;
 
   go("detail");
   track("open_post", { post_type: p.type });
 }
-document.getElementById("d-edit").addEventListener("click", () => { if(current) startEdit(current); });
-document.getElementById("d-delete").addEventListener("click", () => { if(current) adminDelete(current); });
 document.getElementById("d-like").addEventListener("click", async () => {
   if(!current || likedSet.has(current.id)) return;
   markLiked(current.id);
@@ -945,6 +1049,13 @@ function syncComposeFields(){
   document.getElementById("c-report-fields").hidden = (t !== "report");
 }
 cType.addEventListener("change", syncComposeFields);
+
+document.getElementById("compose-cancel").addEventListener("click", () => {
+  const wasEditing = !!editingId;
+  editingId = null;
+  cType.disabled = false;
+  if(wasEditing && admin){ go("admin"); renderAdminList(); } else { go("feed"); }
+});
 
 document.getElementById("fab").addEventListener("click", () => {
   editingId = null;
@@ -990,7 +1101,7 @@ document.getElementById("c-submit").addEventListener("click", async () => {
       cType.disabled = false;
       track("post_edit", { post_type: updated.type });
       renderFeed();
-      go("feed");
+      if(admin){ go("admin"); renderAdminList(); } else { go("feed"); }
       toast("更新しました");
     }else{
       const saved = await apiCreate(post);
@@ -1063,10 +1174,8 @@ function openPlay(p){
 }
 document.getElementById("play-back").addEventListener("click", () => { if(current) openDetail(current.id); else go("feed"); });
 
-/* ---------- オンボーディング / チュートリアル ---------- */
-const ONBOARD_KEY = "moshimoshi-community/onboarded";
-function isOnboarded(){ try{ return !!localStorage.getItem(ONBOARD_KEY); }catch(e){ return false; } }
-function setOnboarded(){ try{ localStorage.setItem(ONBOARD_KEY, "1"); }catch(e){} }
+/* ---------- オンボーディング / チュートリアル ----------
+   はじめて画面（スキップ/聞く）は毎回起動時に表示する仕様。 */
 
 const SLIDES = [
   { n:"1 / 5", h:"もしもコミュニティとは", p:"「もしも○○だったら？」というお題を、みんなで投稿し合う場所です。<br>自作のお題・模範解答・遊んだ結果をシェアできます。" },
@@ -1091,11 +1200,11 @@ function renderSlide(){
   document.getElementById("tut-prev").style.visibility = (slideIdx === 0) ? "hidden" : "visible";
 }
 function startTutorial(){ slideIdx = 0; renderSlide(); go("tutorial"); }
-function finishOnboard(){ setOnboarded(); go("feed"); }
+function finishOnboard(){ go("feed"); }
 
 document.getElementById("ob-yes").addEventListener("click", () => { track("tutorial_start", { from: "onboard" }); startTutorial(); });
 document.getElementById("ob-no").addEventListener("click", () => { track("tutorial_skip"); finishOnboard(); });
-document.getElementById("howto-btn").addEventListener("click", () => { track("tutorial_start", { from: "feed" }); startTutorial(); });
+document.getElementById("howto-btn").addEventListener("click", () => { track("onboard_reopen"); go("onboard"); });
 document.getElementById("tut-skip").addEventListener("click", () => { track("tutorial_skip"); finishOnboard(); });
 document.getElementById("tut-prev").addEventListener("click", () => { if(slideIdx > 0){ slideIdx--; renderSlide(); } });
 document.getElementById("tut-next").addEventListener("click", () => {
@@ -1112,14 +1221,14 @@ document.getElementById("demo-note").hidden = isRemote();
   if(!sk) return;
   adminKey = sk;
   if(!isRemote()){
-    if(!CONFIG.ADMIN_KEY || sk === CONFIG.ADMIN_KEY){ admin = true; applyAdminUI(); }
+    if(!CONFIG.ADMIN_KEY || sk === CONFIG.ADMIN_KEY){ admin = true; }
   }else{
     admin = true;               // 楽観的に復帰。書き込み時にサーバーが再検証する
-    applyAdminUI();
   }
+  applyAdminUI();
 })();
 refreshFeed();
-go(isOnboarded() ? "feed" : "onboard");
+go(admin ? "feed" : "onboard");   // はじめて画面は毎回。ただし管理者セッション中はスキップ
 </script>
 </body>
 </html>
