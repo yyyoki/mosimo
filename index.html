@@ -34,11 +34,22 @@
   }
 
   #app{
-    max-width:520px;
+    max-width:560px;
     margin:0 auto;
     min-height:100vh; min-height:100dvh;
     padding:26px 22px calc(26px + env(safe-area-inset-bottom));
     display:flex; flex-direction:column;
+  }
+
+  /* 広い画面：全画面枠をやめ、中央カラムを1本の面として見せる */
+  @media (min-width:600px){
+    body{ background:#050505; }
+    body::after{ display:none; }
+    #app{
+      border-left:1px solid var(--line);
+      border-right:1px solid var(--line);
+      background:var(--bg);
+    }
   }
 
   .screen{ display:none; flex:1; flex-direction:column; }
@@ -170,13 +181,16 @@
   button.btn:disabled{ opacity:.3; cursor:default; }
 
   .fab{
-    position:fixed; right:calc(50% - 260px + 16px); bottom:calc(20px + env(safe-area-inset-bottom));
+    position:fixed; right:20px; bottom:calc(20px + env(safe-area-inset-bottom));
     z-index:40;
     background:var(--fg); color:var(--bg); border:1px solid var(--fg);
     font:inherit; font-weight:900; font-size:14px; letter-spacing:.06em;
     padding:14px 18px; cursor:pointer; border-radius:0;
   }
-  @media (max-width:552px){ .fab{ right:20px; } }
+  /* 広い画面では中央カラムの右端あたりに寄せる */
+  @media (min-width:600px){
+    .fab{ right:calc(50% - 280px + 14px); }
+  }
 
   .toast{
     position:fixed; left:50%; bottom:26px; transform:translateX(-50%) translateY(20px);
@@ -209,6 +223,9 @@
     padding:8px 16px;
     display:flex; align-items:center; justify-content:space-between;
   }
+  @media (min-width:600px){
+    .admin-bar{ padding-left:max(16px, calc(50% - 280px + 22px)); padding-right:max(16px, calc(50% - 280px + 22px)); }
+  }
   .admin-bar button{
     background:none; border:1px solid var(--bg); color:var(--bg);
     font:inherit; font-weight:800; font-size:11px; letter-spacing:.08em;
@@ -216,14 +233,14 @@
   }
   body.admin #app{ padding-top:46px; }
   body.admin::after{ top:calc(9px + 38px); }
-  .admin-actions{ display:flex; gap:8px; margin-top:10px; padding-top:10px; border-top:1px solid var(--hair); }
+  .admin-actions{ display:flex; gap:8px; margin-top:12px; padding-top:12px; border-top:1px solid var(--fg); }
   .admin-actions button{
     flex:1;
-    border:1px solid var(--line); background:transparent; color:var(--fg);
-    font:inherit; font-weight:800; font-size:12px; letter-spacing:.06em;
-    padding:8px; cursor:pointer;
+    border:1px solid var(--fg); background:transparent; color:var(--fg);
+    font:inherit; font-weight:900; font-size:12.5px; letter-spacing:.1em;
+    padding:9px; cursor:pointer;
   }
-  .admin-actions button:active{ background:var(--panel); }
+  .admin-actions button:hover{ background:var(--fg); color:var(--bg); }
   .admin-actions button.danger{ border-style:dashed; }
 </style>
 </head>
